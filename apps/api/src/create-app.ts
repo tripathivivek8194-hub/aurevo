@@ -81,10 +81,18 @@ export async function createApp(): Promise<INestApplication> {
   // weaken the allow-list against cross-origin attacks.
   const localhostDevPorts = Array.from({ length: 10 }, (_, i) => `http://localhost:${3000 + i}`);
   const loopbackDevPorts = Array.from({ length: 10 }, (_, i) => `http://127.0.0.1:${3000 + i}`);
+  // Optional comma-separated origins for a Pages preview or an additional
+  // first-party storefront domain. WEB_URL remains the canonical URL used in
+  // outbound links; these values only affect browser CORS requests.
+  const additionalCorsOrigins = (process.env.CORS_ALLOWED_ORIGINS ?? '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
 
   const allowedOrigins = new Set(
     [
       process.env.WEB_URL,
+      ...additionalCorsOrigins,
       'http://localhost:3000',
       'http://127.0.0.1:3000',
       'http://localhost:5173',
