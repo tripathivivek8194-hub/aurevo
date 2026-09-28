@@ -60,7 +60,7 @@ export function setOnAuthFailure(handler: (() => void) | null): void {
 
 // Local Docker serves the API under `/api`. The hosted storefront uses the
 // explicitly configured public API instead, so the same source works in both
-// places without changing the locally running website.
+// places without changing the locally running website or its domain.
 const apiBaseUrl = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
 
 export const api: AxiosInstance = axios.create({
