@@ -1,0 +1,23 @@
+# =============================================================================
+# AUREVO — compose override for Cloudflare Flexible SSL tunnel
+#
+# Used with:
+#   docker compose -f docker-compose.prod.yml -f docker-compose.tunnel.yml up -d --build
+#
+# Replaces the edge nginx's ports and config volume:
+#   - Port 80 only (Cloudflare terminates TLS externally; origin is HTTP)
+#   - Uses nginx.tunnel.conf (no 443, no SSL, no HTTP→HTTPS redirect,
+#     CSP allows Razorpay checkout widget)
+#
+# All other services (api, postgres, redis, web) inherit unchanged
+# from docker-compose.prod.yml.
+# =============================================================================
+
+name: aurevo-prod
+
+services:
+  nginx:
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.tunnel.conf:/etc/nginx/nginx.conf:ro

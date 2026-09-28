@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+.next/
+
+# Environment files (secrets)
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Credentials and locally generated authentication material
+certs/
+*.pem
+*.key
+auth-files.txt
+
+# Databases — dev + isolated E2E
+apps/api/prisma/dev.db*
+apps/api/prisma/test-e2e.db*
+*.db
+*.db-journal
+
+# Turborepo cache
+.turbo/
+
+# Logs and OS noise
+*.log
+.DS_Store
+
+# Editor
+.vscode/
+.idea/

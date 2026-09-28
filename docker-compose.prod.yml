@@ -1,0 +1,185 @@
+﻿# =============================================================================
+# AUREVO â€” production Docker Compose
+#
+#   cp .env.example .env &&  # then fill in real secrets
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Production hardening vs. the dev compose:
+#   * postgres & redis expose NO host ports â€” reachable only on the internal
+#     network; all traffic to them flows through the API container.
+#   * Required secrets use `${VAR:?message}` so compose fails fast at config
+#     time if a production secret is missing â€” no weak defaults.
+#   * The API runs as a non-root user (its Dockerfile), and the edge nginx has
+#     `server_tokens off` + security headers (see nginx.conf).
+#
+# TLS is not yet active (no domain): the edge nginx serves HTTP on :80. When
+# you get a domain, mount real certs into ./certs/ and enable the 443 block in
+# nginx.conf (marked TODO(DOMAIN)).
+# =============================================================================
+
+name: aurevo-prod
+
+services:
+  # ---------------------------------------------------------------------------
+  # Edge nginx â€” TLS termination + routing (/api -> api:4000, / -> web:80)
+  # ---------------------------------------------------------------------------
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: aurevo-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+    depends_on:
+      - api
+      - web
+    networks:
+      - aurevo-prod
+
+  # ---------------------------------------------------------------------------
+  # Web — built SPA served by its own internal nginx (static files only)
+  # ---------------------------------------------------------------------------
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_SITE_URL: ${SITE_URL:?SITE_URL must be https://www.aurevo.buzz}
+        VITE_RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
+        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:?VITE_GOOGLE_CLIENT_ID is required}
+    container_name: aurevo-web
+    expose:
+      - "80"
+    restart: unless-stopped
+    networks:
+      - aurevo-prod
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 5s
+      start_period: 5s
+      retries: 3 
+
+  # ---------------------------------------------------------------------------
+  # API â€” NestJS backend (non-root), talks to postgres + redis internally
+  # ---------------------------------------------------------------------------
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: aurevo-api
+    environment:
+      NODE_ENV: production
+      PORT: "4000"
+      # Public origin the store is served at; used for CORS allowlist, canonical
+      # urls, sitemap, and HSTS/connect-src wiring.
+      WEB_URL: ${SITE_URL:?SITE_URL must be https://www.aurevo.buzz}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?ADMIN_EMAIL is required}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?GOOGLE_CLIENT_ID is required}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-aurevo}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-aurevo}
+      REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379
+
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET is required}
+      JWT_ACCESS_EXPIRY: ${JWT_ACCESS_EXPIRY:-15m}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required}
+      JWT_REFRESH_EXPIRY: ${JWT_REFRESH_EXPIRY:-30d}
+
+      # AES-256-GCM key for stored supplier credentials â€” required in prod.
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY is required}
+
+      # TEMP-DEPLOY-AHEAD-OF-RAZORPAY: :- allows empty to pass through;
+      # API env-validation warns and boots when the trio is absent. When live
+      # keys are set in .env, the API re-enforces strict rzp_live_ format.
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
+      RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-}
+
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-resend}
+      EMAIL_API_KEY: ${EMAIL_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-noreply@aurevo.com}
+      EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-AUREVO}
+
+      ALIEXPRESS_APP_KEY: ${ALIEXPRESS_APP_KEY:-}
+      ALIEXPRESS_APP_SECRET: ${ALIEXPRESS_APP_SECRET:-}
+      ALIEXPRESS_ACCESS_TOKEN: ${ALIEXPRESS_ACCESS_TOKEN:-}
+      ALIEXPRESS_TRACKING_URL: ${ALIEXPRESS_TRACKING_URL:-}
+      ALIEXPRESS_CALLBACK_URL: ${ALIEXPRESS_CALLBACK_URL:-}
+
+      INDIAMART_CRM_ID: ${INDIAMART_CRM_ID:-}
+      INDIAMART_API_KEY: ${INDIAMART_API_KEY:-}
+
+      ENABLE_SUPPLIER_SYNC: ${ENABLE_SUPPLIER_SYNC:-true}
+      ENABLE_REVIEWS: ${ENABLE_REVIEWS:-true}
+      ENABLE_WISHLIST: ${ENABLE_WISHLIST:-true}
+      ENABLE_ANALYTICS: ${ENABLE_ANALYTICS:-true}
+    expose:
+      - "4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - aurevo-prod
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:4000/api/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+  # ---------------------------------------------------------------------------
+  # Postgres â€” internal only (NO host port)
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: aurevo-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-aurevo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-aurevo}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aurevo} -d ${POSTGRES_DB:-aurevo}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - aurevo-prod
+
+  # ---------------------------------------------------------------------------
+  # Redis â€” internal only (NO host port), auth required
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: aurevo-redis
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+      --appendonly yes
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - aurevo-prod
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  aurevo-prod:
+    driver: bridge
+

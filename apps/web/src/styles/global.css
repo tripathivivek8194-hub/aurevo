@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Design-system CSS custom properties (--color-*, --shadow-*, fonts, spacing)
+   are injected at runtime via generateAllCSS() in main.tsx. */
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background-color: var(--color-background-primary);
+  color: var(--color-text-primary);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
