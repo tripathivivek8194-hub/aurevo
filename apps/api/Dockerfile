@@ -66,9 +66,11 @@ RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=build /app/apps/api/dist apps/api/dist
 COPY --from=build /app/packages/shared/dist packages/shared/dist
 
-# Prisma schema + generated client + MIGRATIONS (for db migrate deploy at startup).
-COPY apps/api/prisma/schema.prisma apps/api/prisma/schema.prisma
-COPY apps/api/prisma/migrations apps/api/prisma/migrations
+# Prisma schema + generated client + migrations (for `migrate deploy` at
+# startup). Copy these from the build stage so the runtime image receives the
+# exact repository tree that Prisma validated during compilation.
+COPY --from=build /app/apps/api/prisma/schema.prisma apps/api/prisma/schema.prisma
+COPY --from=build /app/apps/api/prisma/migrations apps/api/prisma/migrations
 COPY --from=build /app/node_modules/.prisma node_modules/.prisma
 COPY --from=build /app/node_modules/@prisma/client node_modules/@prisma/client
 # Prisma CLI is a devDependency, but we need it for `db push` at startup.
