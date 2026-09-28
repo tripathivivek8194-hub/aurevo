@@ -1,0 +1,417 @@
+<title>AUREVO completeness audit</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
+<style>
+  :root {
+    --bg: #f6f5f1;
+    --surface: #ffffff;
+    --surface-2: #f0efeb;
+    --ink: #161a1e;
+    --ink-2: #4f575e;
+    --ink-3: #858d94;
+    --line: #e2e0da;
+    --accent: #0e6a62;
+    --accent-ink: #ffffff;
+    --good: #1d7a44;
+    --good-bg: #e3f2e8;
+    --warn: #a75e0a;
+    --warn-bg: #faeedd;
+    --bad: #b42318;
+    --bad-bg: #fbe5e3;
+    --info: #2f5fa8;
+    --info-bg: #e5edf8;
+    --shadow: 0 1px 2px rgba(22,26,30,.05), 0 6px 20px -12px rgba(22,26,30,.18);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #101316;
+      --surface: #191d21;
+      --surface-2: #161a1e;
+      --ink: #e9ebed;
+      --ink-2: #aab1b7;
+      --ink-3: #6d757c;
+      --line: #2a2f34;
+      --accent: #2fb3a4;
+      --accent-ink: #08110f;
+      --good: #3cc06f;
+      --good-bg: #12301f;
+      --warn: #e0a14c;
+      --warn-bg: #33240f;
+      --bad: #ef6b5e;
+      --bad-bg: #391a16;
+      --info: #6f9de0;
+      --info-bg: #17243a;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 26px -14px rgba(0,0,0,.55);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #101316;
+    --surface: #191d21;
+    --surface-2: #161a1e;
+    --ink: #e9ebed;
+    --ink-2: #aab1b7;
+    --ink-3: #6d757c;
+    --line: #2a2f34;
+    --accent: #2fb3a4;
+    --accent-ink: #08110f;
+    --good: #3cc06f;
+    --good-bg: #12301f;
+    --warn: #e0a14c;
+    --warn-bg: #33240f;
+    --bad: #ef6b5e;
+    --bad-bg: #391a16;
+    --info: #6f9de0;
+    --info-bg: #17243a;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 26px -14px rgba(0,0,0,.55);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 56px 20px 96px;
+    padding-block: 56px 96px;
+  }
+
+  .eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 600;
+  }
+  h1 {
+    font-size: 40px;
+    line-height: 1.05;
+    font-weight: 700;
+    letter-spacing: -.02em;
+    margin: 14px 0 10px;
+    text-wrap: balance;
+  }
+  .lede {
+    font-size: 17px;
+    color: var(--ink-2);
+    max-width: 62ch;
+    margin: 0 0 28px;
+  }
+  .meta {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 12px;
+    color: var(--ink-3);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 18px;
+    padding-bottom: 26px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .verdict {
+    margin: 30px 0 8px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--warn);
+    border-radius: 8px;
+    padding: 22px 26px;
+    box-shadow: var(--shadow);
+  }
+  .verdict h2 {
+    margin: 0 0 8px;
+    font-size: 18px;
+    font-weight: 600;
+    text-wrap: balance;
+  }
+  .verdict p { margin: 0; color: var(--ink-2); font-size: 15px; max-width: 70ch; }
+
+  h2.sec {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: .01em;
+    margin: 44px 0 6px;
+    padding-top: 18px;
+  }
+  .sec-note { font-size: 13px; color: var(--ink-3); margin: 0 0 18px; font-family: "IBM Plex Mono",ui-monospace,monospace; }
+
+  /* Status snapshot grid */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 12px;
+  }
+  .chip {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface);
+    padding: 14px 16px 13px;
+    box-shadow: var(--shadow);
+  }
+  .chip .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .chip .name { font-weight: 600; font-size: 14px; }
+  .chip .detail { margin-top: 4px; font-size: 12.5px; color: var(--ink-2); line-height: 1.4; }
+
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .tag::before { content: ""; width: 6px; height: 6px; border-radius: 2px; background: currentColor; }
+  .t-good { color: var(--good); background: var(--good-bg); }
+  .t-warn { color: var(--warn); background: var(--warn-bg); }
+  .t-bad  { color: var(--bad);  background: var(--bad-bg); }
+
+  /* Module detail sections */
+  .module {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface);
+    margin: 0 0 14px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+  .module header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 16px 22px;
+    border-bottom: 1px solid var(--line);
+  }
+  .module header .t { font-size: 16px; font-weight: 600; }
+  .module header .tcode { font-family: "IBM Plex Mono",ui-monospace,monospace; font-size: 11px; color: var(--ink-3); margin-top: 2px; letter-spacing:.04em;}
+  .module .body { padding: 16px 22px 20px; font-size: 14.5px; color: var(--ink); }
+  .module .body p { margin: 0 0 10px; max-width: 72ch; }
+  .module .body p:last-child { margin-bottom: 0; }
+  .evid { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 11.5px; color: var(--ink-2); background: var(--surface-2); border-radius: 5px; padding: 2px 7px; }
+  ul.check { list-style: none; margin: 8px 0 0; padding: 0; }
+  ul.check li { position: relative; padding-left: 22px; margin: 6px 0; font-size: 14px; color: var(--ink); max-width: 72ch;}
+  ul.check li::before { content: ""; position: absolute; left: 2px; top: .52em; width: 7px; height: 7px; border-radius: 2px; background: var(--accent); opacity:.85;}
+  ul.check li.gap::before { background: var(--warn); }
+  ul.check li.block::before { background: var(--bad); }
+  b.k { color: var(--ink); }
+  ul.check li.note { color: var(--ink-2); }
+  ul.check li.note::before { background: var(--ink-3); }
+
+  .gaptable { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 6px; }
+  .gaptable th { text-align: left; font-family: "IBM Plex Mono",ui-monospace,monospace; font-size: 11px; text-transform: uppercase; letter-spacing:.07em; color: var(--ink-3); padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  .gaptable td { padding: 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .gaptable tr:last-child td { border-bottom: none; }
+  .gaptable td.pri { white-space: nowrap; }
+  .pri { display:inline-block; font-family:"IBM Plex Mono",ui-monospace,monospace; font-weight:600; font-size:11px; padding: 2px 8px; border-radius:5px; }
+  .p0 { color: var(--bad); background: var(--bad-bg); }
+  .p1 { color: var(--warn); background: var(--warn-bg); }
+  .p2 { color: var(--ink-2); background: var(--surface-2); }
+
+  .action { display:flex; gap:16px; align-items:flex-start; padding:16px 4px; border-bottom:1px solid var(--line); }
+  .action:last-child { border-bottom:none; }
+  .action .pri { margin-top: 3px; flex-shrink:0; }
+  .action .a { }
+  .action .a .t { font-weight:600; font-size:15px; }
+  .action .a .d { font-size:14px; color: var(--ink-2); margin-top:3px; max-width:70ch; }
+  .action .a .cmd { font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:11.5px; color: var(--accent); background: var(--surface-2); border-radius:5px; padding:2px 7px; display:inline-block; margin-top:6px; overflow-wrap:anywhere;}
+
+  .footerline { margin-top: 44px; padding-top: 20px; border-top: 1px solid var(--line); font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:11.5px; color: var(--ink-3); }
+
+  kbd { font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:12px; background: var(--surface-2); border-radius:4px; padding:1px 6px; }
+</style>
+
+<div class="wrap">
+
+  <div class="eyebrow">Engineering audit · AUREVO</div>
+  <h1>Completeness audit</h1>
+  <p class="lede">A module-by-module review of the AUREVO storefront &mdash; what is built and verified, what works only with gaps, and what blocks a customer from actually completing an order today.</p>
+  <div class="meta">
+    <span>Scope: full monorepo (api · web · design-system · shared)</span>
+    <span>Target: aurevo.buzz (Docker + Cloudflare Tunnel)</span>
+    <span>Prior issue resolved: cart empty / P2002</span>
+  </div>
+
+  <div class="verdict">
+    <h2>Bottom line: the storefront is real and runs on live payments. Two data/config blockers stand between it and a completing order.</h2>
+    <p>The application is far more complete than the seed stubs once suggested &mdash; every admin section, the analytics engine, and the Razorpay payment flow are genuinely implemented and verified, and the security posture is sound end to end. But two production-data omissions &mdash; an empty <span class="evid">shipping_methods</span> table and disabled transactional email &mdash; are the difference between a showcase and a shop that can finish a sale and confirm it.</p>
+  </div>
+
+  <h2 class="sec">Status snapshot</h2>
+  <p class="sec-note">one rating per module · detail below each</p>
+  <div class="grid">
+
+    <div class="chip"><div class="row"><span class="name">Cart</span><span class="tag t-good">complete</span></div><div class="detail">Atomic upsert; guest + signed-in; merge on login.</div></div>
+    <div class="chip"><div class="row"><span class="name">Checkout &amp; payments</span><span class="tag t-good">complete</span></div><div class="detail">Razorpay live; webhook + client verify; refunds.</div></div>
+    <div class="chip"><div class="row"><span class="name">Orders</span><span class="tag t-good">complete</span></div><div class="detail">State machine, inventory reserve/release, history.</div></div>
+    <div class="chip"><div class="row"><span class="name">Catalog &amp; categories</span><span class="tag t-good">complete</span></div><div class="detail">100 live products, single verified feed.</div></div>
+    <div class="chip"><div class="row"><span class="name">Admin panel</span><span class="tag t-good">complete</span></div><div class="detail">All 10 sections real; stub page is vestigial.</div></div>
+    <div class="chip"><div class="row"><span class="name">Analytics</span><span class="tag t-good">complete</span></div><div class="detail">6 DB-backed endpoints + dashboard charts.</div></div>
+    <div class="chip"><div class="row"><span class="name">Security</span><span class="tag t-good">complete</span></div><div class="detail">All 21 controllers guarded; payment integrity.</div></div>
+    <div class="chip"><div class="row"><span class="name">Auth &amp; accounts</span><span class="tag t-good">complete</span></div><div class="detail">JWT + refresh cookies; roles; reset/verify flows.</div></div>
+    <div class="chip"><div class="row"><span class="name">Suppliers / CJ</span><span class="tag t-good">complete</span></div><div class="detail">Guarded module is real, no stubs.</div></div>
+    <div class="chip"><div class="row"><span class="name">Inventory &amp; wishlist</span><span class="tag t-good">complete</span></div><div class="detail">Tracked stock; owner-scoped wishlist.</div></div>
+    <div class="chip"><div class="row"><span class="name">Shipping</span><span class="tag t-warn">blocked</span></div><div class="detail">Code fine &mdash; but 0 methods in prod DB.</div></div>
+    <div class="chip"><div class="row"><span class="name">Email</span><span class="tag t-warn">disabled</span></div><div class="detail">Resend-backed; key empty &rarr; no-op mode.</div></div>
+    <div class="chip"><div class="row"><span class="name">Settings</span><span class="tag t-warn">partial</span></div><div class="detail">Shipping CRUD real; store settings unbacked.</div></div>
+    <div class="chip"><div class="row"><span class="name">Infrastructure</span><span class="tag t-good">complete</span></div><div class="detail">Hardened Docker, tunnel, CSP for Razorpay.</div></div>
+
+  </div>
+
+  <h2 class="sec">Module detail</h2>
+  <p class="sec-note">evidence is the code, the schema, or the running config &mdash; marked as such</p>
+
+  <div class="module">
+    <header><div><div class="t">Shopping cart</div><div class="tcode">apps/api · modules/cart · apps/web · stores/cart.ts</div></div><span class="tag t-good">complete</span></header>
+    <div class="body">
+      <p>Root cause of the historical <b>"empty cart + P2002"</b> is fixed: cart creation is a single atomic <span class="evid">prisma.cart.upsert</span>, which compiles to <span class="evid">INSERT&#8230; ON CONFLICT DO UPDATE</span> &mdash; two concurrent requests can no longer both miss and both create, so P2002 is impossible by construction. A regression test asserts <span class="evid">cart.create</span> is never called.</p>
+      <ul class="check">
+        <li>Guest carts keyed by validated UUID <span class="evid">sessionId</span>; signed-in keyed by <span class="evid">userId</span> from JWT — the two identities never mix.</li>
+        <li>Guest&rarr;user merge on login is awaited and only clears the guest id after success.</li>
+        <li>Checkout pre-validation catches stale price snapshots and insufficient stock.</li>
+        <li>Integer totals (minor currency units) — no float drift.</li>
+        <li>Security: merge target must be a well-formed UUID; an authenticated caller only ever reads their own cart.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="module">
+    <header><div><div class="t">Checkout &amp; payments</div><div class="tcode">apps/api · modules/payments · Razorpay live</div></div><span class="tag t-good">complete</span></header>
+    <div class="body">
+      <p>Production-grade. Live keys present (<span class="evid">rzp_live_TbTJ4mqScBJd3r</span>), and the web front-end's "Payments coming soon" dead branch does not fire.</p>
+      <ul class="check">
+        <li>Amount is derived server-side from the DB &mdash; the client can never set it.</li>
+        <li>Idempotency + order-state guards prevent double capture; duplicate live orders suppressed.</li>
+        <li>Client-verify re-derives the amount from the Razorpay API; both webhook and verify check an HMAC-SHA256 signature in constant time.</li>
+        <li>Full and partial refunds tracked with a <span class="evid">Refund</span> row.</li>
+        <li>Inventory is released on payment failure, resent on success.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="module">
+    <header><div><div class="t">Shipping</div><div class="tcode">apps/api · modules/shipping</div></div><span class="tag t-warn">code ready, data missing</span></header>
+    <div class="body">
+      <p>The feature is implemented and admin-callable, but the <b>production database contains zero shipping methods</b>. The seed that would create one is intentionally disabled in production and never runs. Until at least one active row exists, checkout has nothing to select.</p>
+      <ul class="check">
+        <li class="gap">Blocker &mdash; prod <span class="evid">shipping_methods</span> is empty. Fix via admin Settings UI, or insert a row directly (idempotent <span class="evid">ON CONFLICT (code) DO NOTHING</span>).</li>
+        <li class="note">Not a code defect &mdash; a provisioning gap from seed-once data.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="module">
+    <header><div><div class="t">Email</div><div class="tcode">apps/api · modules/email · Resend</div></div><span class="tag t-warn">disabled</span></header>
+    <div class="body">
+      <p>Resend-backed with three flows (verification, password reset, order confirmation). With <span class="evid">EMAIL_API_KEY</span> empty, the service logs <span class="evid">[EMAIL-NOOP]</span> and sends nothing.</p>
+      <ul class="check">
+        <li class="gap">No transactional email reaches customers &mdash; verification links and order confirmations are printed to logs only.</li>
+        <li class="gap">Password reset and verify-email are therefore unclosable for real accounts.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="module">
+    <header><div><div class="t">Admin panel &amp; settings</div><div class="tcode">apps/web · pages/admin · layouts/admin</div></div><span class="tag t-warn">10/10 real, settings partial</span></header>
+    <div class="body">
+      <p>Every one of the ten sections &mdash; Dashboard, Orders, Products, Customers, Suppliers, Reviews, Categories, Analytics, Inventory, Settings &mdash; is a real implementation wired to a real endpoint. The old <span class="evid">StubPage</span> placeholder is imported by no admin page (vestigial).</p>
+      <ul class="check">
+        <li>Dashboard: KPI cards, trends, top products/customers, recent orders — from a live <span class="evid">/admin/dashboard</span> call.</li>
+        <li>Analytics: six DB-backed endpoints (revenue, conversion funnel, customers, products, traffic, realtime).</li>
+        <li class="gap"><b>Settings is partial.</b> Shipping-method CRUD is real, but the module honestly flags store name/branding, default currency, tax config, email templates, and AliExpress credentials as not backed by any settings table yet.</li>
+        <li class="gap">Account page: changing email requires re-verification, which is not implemented &mdash; email is display-only.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="module">
+    <header><div><div class="t">Security posture</div><div class="tcode">all 21 controllers</div></div><span class="tag t-good">complete</span></header>
+    <div class="body">
+      <ul class="check">
+        <li>Admin mutations (inventory, analytics, suppliers, CJ, admin-products) carry controller-level <span class="evid">JwtAuthGuard + RolesGuard + @Roles(ADMIN)</span>.</li>
+        <li>Public reads vs admin-guarded writes correctly split on products, categories, shipping, reviews, orders, payments.</li>
+        <li>Cart / checkout use <span class="evid">OptionalJwtAuthGuard</span> for guests; wishlist is owner-scoped; webhooks intentionally public.</li>
+        <li>JWT access (15&prime;) + HttpOnly refresh cookie (30d); bcrypt cost 12.</li>
+        <li>Weak-secret rejection and live-key validation in env config; CSP admits only the Razorpay checkout widget.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="module">
+    <header><div><div class="t">Infrastructure</div><div class="tcode">docker-compose.prod · nginx.tunnel.conf · Cloudflare</div></div><span class="tag t-good">complete</span></header>
+    <div class="body">
+      <ul class="check">
+        <li>API runs <span class="evid">prisma db push</span> at startup (no migrate, no seed) — safe against accidental prod seeding.</li>
+        <li>Postgres/Redis internal-only; `${VAR:?}` fast-fail on missing secrets; API healthcheck.</li>
+        <li>Cloudflare Flexible SSL; nginx strips headers, hides server tokens, and its CSP is correct for Razorpay.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2 class="sec">The gaps that matter</h2>
+  <p class="sec-note">everything that stops a sale or a convincing admin experience</p>
+  <div class="grid">
+    <div class="chip"><div class="row"><span class="name">Shipping methods = 0</span><span class="tag t-bad">P0</span></div><div class="detail">Prod DB empty &mdash; blocks checkout. Insert a row or add via admin Settings.</div></div>
+    <div class="chip"><div class="row"><span class="name">Transactional email off</span><span class="tag t-warn">P1</span></div><div class="detail">Set a live Resend key so verify / reset / order emails actually send.</div></div>
+    <div class="chip"><div class="row"><span class="name">Store settings unbacked</span><span class="tag t-warn">P2</span></div><div class="detail">Branding, currency, tax, email templates — no settings table yet.</div></div>
+    <div class="chip"><div class="row"><span class="name">Email-change re-verify</span><span class="tag t-warn">P2</span></div><div class="detail">Account page: email is display-only until re-verification exists.</div></div>
+  </div>
+
+  <h2 class="sec">Recommended actions, prioritized</h2>
+  <p class="sec-note">in order of impact to a completing sale</p>
+
+  <div class="action">
+    <span class="pri p0">P0</span>
+    <div class="a">
+      <div class="t">Seed at least one active shipping method into the production database</div>
+      <div class="d">Unblocks checkout. Easiest via the admin Settings page (shipping-method CRUD is built), or a direct insert. Idempotent upsert on the <span class="evid">code</span> column &mdash; safe to run even if a row already exists.</div>
+      <span class="cmd">INSERT INTO shipping_methods (id, name, code, baseCost, estimatedDays, currency, isActive, sortOrder, createdAt, updatedAt) VALUES ('seed_shipping_1', 'Standard Shipping', 'standard', 0, 5, 'INR', true, 0, now(), now()) ON CONFLICT (code) DO NOTHING;</span>
+    </div>
+  </div>
+
+  <div class="action">
+    <span class="pri p1">P1</span>
+    <div class="a">
+      <div class="t">Set a real Resend API key and confirm one order's confirmation email lands</div>
+      <div class="d">Turns verification, password-reset, and order-confirmation from log lines into real emails. Configure <span class="evid">EMAIL_API_KEY</span> plus a verified sender domain, then place a test order and confirm the receipt arrives.</div>
+    </div>
+  </div>
+
+  <div class="action">
+    <span class="pri p1">P1</span>
+    <div class="a">
+      <div class="t">Verify the shipping insert is effective, then run one end-to-end order</div>
+      <div class="d">After the P0 row exists: add to cart &rarr; checkout &rarr; select the method &rarr; Razorpay. Confirms the whole funnel &mdash; cart, checkout, payment, order, inventory release &mdash; in one pass.</div>
+    </div>
+  </div>
+
+  <div class="action">
+    <span class="pri p2">P2</span>
+    <div class="a">
+      <div class="t">Build the settings store: branding, currency, tax, email templates</div>
+      <div class="d">Replaces the honest "not backed yet" gap on the Settings page. Also covers AliExpress / supplier credentials currently kept only in env.</div>
+    </div>
+  </div>
+
+  <div class="action">
+    <span class="pri p2">P2</span>
+    <div class="a">
+      <div class="t">Implement email-change re-verification on the Account page</div>
+      <div class="d">Closes the last display-only field; depends on P1 so the new-address verification link can be delivered.</div>
+    </div>
+  </div>
+
+  <div class="footerline">
+    AUREVO completeness audit &mdash; regenerated 2026-09-14 &middot; live payments on Razorpay &middot; storefront on aurevo.buzz
+  </div>
+
+</div>

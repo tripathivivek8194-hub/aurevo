@@ -1,0 +1,12 @@
+# AUREVO robots.txt
+
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /api
+Disallow: /account
+Disallow: /checkout
+Disallow: /login
+Disallow: /register
+
+Sitemap: https://aurevo.buzz/sitemap.xml

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="x-apple-disable-message-reformatting" />
+    <title>Order confirmed</title>
+  </head>
+  <body style="margin:0;padding:0;background-color:#faf8f5;font-family:Helvetica,Arial,sans-serif;color:#2b2620;-webkit-text-size-adjust:100%;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#faf8f5;">
+      <tr>
+        <td align="center" style="padding:32px 16px;">
+          <!-- Card -->
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;width:100%;background-color:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #ece6de;">
+            <!-- Brand bar -->
+            <tr>
+              <td style="padding:24px 32px;background-color:#2b2620;">
+                <span style="color:#ffffff;font-size:22px;font-weight:700;letter-spacing:3px;font-family:Georgia,'Times New Roman',serif;">AUREVO</span>
+              </td>
+            </tr>
+            <!-- Body -->
+            <tr>
+              <td style="padding:32px 32px 24px;">
+                <h1 style="margin:0 0 12px;font-size:20px;font-weight:700;color:#2b2620;">Order confirmed</h1>
+                <p style="margin:0 0 8px;font-size:15px;line-height:1.6;color:#6b635a;">
+                  Thanks for your order. We've received it and are getting it ready for dispatch.
+                </p>
+                <p style="margin:0 0 24px;font-size:14px;line-height:1.6;color:#8a8278;">
+                  Order number: <strong style="color:#2b2620;">{{orderNumber}}</strong>
+                </p>
+
+                <!-- Items -->
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:0 0 20px;">
+                  <thead>
+                    <tr>
+                      <th align="left" style="border-bottom:1px solid #ece6de;padding:8px 10px;font-size:12px;font-weight:600;color:#8a8278;text-transform:uppercase;">Item</th>
+                      <th align="center" style="border-bottom:1px solid #ece6de;padding:8px 10px;font-size:12px;font-weight:600;color:#8a8278;text-transform:uppercase;">Qty</th>
+                      <th align="right" style="border-bottom:1px solid #ece6de;padding:8px 10px;font-size:12px;font-weight:600;color:#8a8278;text-transform:uppercase;">Price</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {{itemsRows}}
+                  </tbody>
+                </table>
+
+                <!-- Total -->
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+                  <tr>
+                    <td align="right" style="padding:16px 0;border-top:2px solid #2b2620;">
+                      <span style="font-size:13px;color:#8a8278;">Total&nbsp;&nbsp;</span>
+                      <span style="font-size:18px;font-weight:700;color:#2b2620;">{{total}}</span>
+                      <span style="font-size:14px;font-weight:600;color:#8a8278;"> {{currency}}</span>
+                    </td>
+                  </tr>
+                </table>
+
+                <!-- CTA -->
+                <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0;">
+                  <tr>
+                    <td>
+                      <a href="{{orderUrl}}" style="display:inline-block;background-color:#ae7855;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:13px 28px;border-radius:8px;">
+                        View order
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <!-- Footer -->
+            <tr>
+              <td style="padding:20px 32px;background-color:#f7f4ef;border-top:1px solid #ece6de;">
+                <p style="margin:0;font-size:12px;line-height:1.5;color:#a49b8f;text-align:center;">
+                  &copy; AUREVO &middot; Curated ecommerce storefront<br />
+                  Questions about your order? Check your order status in your AUREVO account.
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

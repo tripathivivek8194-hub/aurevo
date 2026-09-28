@@ -1,0 +1,615 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enums as String (SQLite doesn't support native enums)
+model User {
+  id              String    @id @default(cuid())
+  email           String    @unique
+  passwordHash    String
+  firstName       String
+  lastName        String
+  role            String    @default("CUSTOMER") // CUSTOMER | ADMIN
+  isActive        Boolean   @default(true)
+  emailVerified   Boolean   @default(false)
+  lastLoginAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  addresses       Address[]
+  orders          Order[]
+  cart            Cart?
+  wishlist        Wishlist?
+  reviews         Review[]
+  refreshTokens   RefreshToken[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  tokenId   String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  revoked   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([token])
+  @@index([tokenId])
+  @@map("refresh_tokens")
+}
+
+model RevokedToken {
+  id        String   @id @default(cuid())
+  tokenId   String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([tokenId])
+  @@map("revoked_tokens")
+}
+
+model Address {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        String   @default("SHIPPING") // SHIPPING | BILLING
+  firstName   String
+  lastName    String
+  company     String?
+  address1    String
+  address2    String?
+  city        String
+  state       String
+  postalCode  String
+  country     String
+  phone       String
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@map("addresses")
+}
+
+model Category {
+  id          String     @id @default(cuid())
+  name        String
+  slug        String     @unique
+  description String?
+  image       String?
+  parentId    String?
+  parent      Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children    Category[] @relation("CategoryHierarchy")
+  isActive    Boolean    @default(true)
+  sortOrder   Int        @default(0)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  products    Product[]
+
+  @@index([parentId])
+  @@index([slug])
+  @@map("categories")
+}
+
+model Product {
+  id                   String   @id @default(cuid())
+  name                 String
+  slug                 String   @unique
+  description          String
+  shortDescription     String?
+  sku                  String   @unique
+  basePrice            Int      // Stored in cents (minor units)
+  compareAtPrice       Int?     // Stored in cents
+  cost                 Int?     // Supplier landed cost in cents (paise). Required for ACTIVE products.
+  currency             String   @default("INR")
+  status               String   @default("DRAFT") // DRAFT | ACTIVE | ARCHIVED
+  isFeatured           Boolean  @default(false)
+  categoryId           String
+  category             Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  supplierId           String?
+  supplier             Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  supplierProductId    String?
+  supplierVariantId    String?
+  metadata             String?  // JSON string
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  variants             ProductVariant[]
+  images               ProductImage[]
+  inventory            Inventory[]
+  reviews              Review[]
+  wishlistItems        WishlistItem[]
+  orderItems           OrderItem[]
+  supplierProducts     SupplierProduct[]
+  cartItems            CartItem[]
+
+  @@index([categoryId])
+  @@index([slug])
+  @@index([status])
+  @@index([isFeatured])
+  @@index([supplierId])
+  @@map("products")
+}
+
+// A resumable AliExpress catalog-import job. Persists the pagination cursor
+// (`nextPage`) and running counts so an interrupted import continues from the
+// next page (Run 1 -> 1-25, Run 2 -> 26-50, ...). `status` is a String constant
+// (PENDING | RUNNING | PAUSED | COMPLETED | CANCELLED | FAILED) because SQLite
+// has no native enum support — validated in the service layer.
+// `failedIds` is a JSON array of AliExpress product ids that failed transiently
+// and can be retried via the retry endpoint.
+model ProductImportJob {
+  id             String   @id @default(cuid())
+  feedName       String
+  country        String
+  categoryId     String
+  perRunLimit    Int      @default(25) // products per advance == AliExpress page size
+  currency       String   @default("INR")
+  enrich         Boolean  @default(false)
+  mode           String   @default("update") // 'update' | 'skip' dedup behavior
+  status         String   @default("PENDING")
+  nextPage       Int      @default(1) // resume cursor: next feed page to fetch
+  isFeedFinished Boolean  @default(false)
+  processedCount Int      @default(0)
+  importedCount  Int      @default(0)
+  updatedCount   Int      @default(0)
+  skippedCount   Int      @default(0)
+  errorCount     Int      @default(0)
+  enrichedVariantCount Int @default(0)
+  enrichFailedCount    Int @default(0)
+  failedIds      String? // JSON array of AE product ids to retry
+  errorMessage   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  startedAt      DateTime?
+  completedAt    DateTime?
+  cancelledAt    DateTime?
+
+  @@index([status])
+  @@index([feedName, country, categoryId])
+  @@map("product_import_jobs")
+}
+
+model ProductVariant {
+  id            String   @id @default(cuid())
+  productId     String
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name          String
+  sku           String   @unique
+  price         Int      // Stored in cents
+  compareAtPrice Int?    // Stored in cents
+  weight        Int?     // Stored in grams
+  dimensions    String?  // JSON string
+  attributes    String   @default("{}") // JSON string: { color: "Red", size: "L" }
+  sortOrder     Int      @default(0)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  inventory     Inventory?
+  orderItems    OrderItem[]
+  cartItems     CartItem[]
+  supplierProducts SupplierProduct[]
+  wishlistItems WishlistItem[]
+
+  @@index([productId])
+  @@index([sku])
+  @@map("product_variants")
+}
+
+model ProductImage {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String
+  alt       String?
+  sortOrder Int      @default(0)
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([productId])
+  @@map("product_images")
+}
+
+model Inventory {
+  id                 String   @id @default(cuid())
+  productId          String
+  product            Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  // variantId is null for a product-level inventory row (product has no
+  // variants); one row per variant otherwise.
+  variantId          String?  @unique
+  variant            ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  quantity           Int      @default(0)
+  reservedQuantity   Int      @default(0)
+  lowStockThreshold  Int      @default(10)
+  trackQuantity      Boolean  @default(true)
+  allowBackorder     Boolean  @default(false)
+  supplierStock      Int?
+  lastSyncedAt       DateTime?
+  syncStatus         String?  @default("PENDING")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([productId])
+  @@index([variantId])
+  @@map("inventory")
+}
+
+model Supplier {
+  id            String       @id @default(cuid())
+  name          String
+  code          String       @unique // ALIEXPRESS | INDIAMART
+  apiConfig     String       // Encrypted JSON
+  isActive      Boolean      @default(true)
+  syncEnabled   Boolean      @default(false)
+  lastSyncedAt  DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  products      Product[]
+  supplierProducts SupplierProduct[]
+  shipments     Shipment[]
+
+  @@map("suppliers")
+}
+
+model SupplierProduct {
+  id                String   @id @default(cuid())
+  supplierId        String
+  supplier          Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  supplierProductId String
+  supplierVariantId String?
+  productId         String
+  product           Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId         String?
+  variant           ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  mappingData       String   @default("{}") // JSON string
+  lastSyncedAt      DateTime?
+  syncStatus        String   @default("PENDING")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([supplierId, supplierProductId, supplierVariantId])
+  @@index([productId])
+  @@index([variantId])
+  @@map("supplier_products")
+}
+
+model Cart {
+  id        String   @id @default(cuid())
+  userId    String?  @unique
+  sessionId String?  @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items     CartItem[]
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([sessionId])
+  @@map("carts")
+}
+
+model CartItem {
+  id            String   @id @default(cuid())
+  cartId        String
+  cart          Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId     String
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId     String?
+  variant       ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  quantity      Int      @default(1)
+  priceSnapshot Int      // Stored in cents
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([cartId, productId, variantId])
+  @@index([cartId])
+  @@index([productId])
+  @@index([variantId])
+  @@map("cart_items")
+}
+
+model Order {
+  id              String       @id @default(cuid())
+  orderNumber     String       @unique
+  userId          String?
+  user            User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  email           String
+  // sessionId: set at checkout for guest (userId: null) orders. Acts as a
+  // capability token so the guest who created the order can later pay for it
+  // without an account. Cleared once the order is PAID. Never logged.
+  sessionId       String?
+  status          String       @default("PENDING") // PENDING | PAYMENT_PENDING | PAID | PROCESSING | FULFILLMENT | SHIPPED | DELIVERED | CANCELLED | REFUNDED | FAILED | RETURNED
+  subtotal        Int          // Stored in cents
+  shippingCost    Int          // Stored in cents
+  tax             Int          // Stored in cents
+  discount        Int          @default(0) // Stored in cents
+  total           Int          // Stored in cents
+  currency        String       @default("INR")
+  shippingAddress String       // JSON string
+  billingAddress  String       // JSON string
+  notes           String?
+  paidAt          DateTime?
+  shippedAt       DateTime?
+  deliveredAt     DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  items           OrderItem[]
+  payments        Payment[]
+  shipments       Shipment[]
+  reviews         Review[]
+
+  @@index([userId])
+  @@index([orderNumber])
+  @@index([sessionId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("orders")
+}
+
+model OrderItem {
+  id                   String   @id @default(cuid())
+  orderId              String
+  order                Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId            String
+  product              Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+  variantId            String?
+  variant              ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  productName          String
+  productSku           String
+  variantName          String?
+  quantity             Int
+  unitPrice            Int      // Stored in cents
+  totalPrice           Int      // Stored in cents
+  supplierId           String?
+  supplierProductId    String?
+  supplierVariantId    String?
+  createdAt            DateTime @default(now())
+
+  @@index([orderId])
+  @@index([productId])
+  @@map("order_items")
+}
+
+model Payment {
+  id                String        @id @default(cuid())
+  // NOT unique: an unpaid order may retry after a FAILED attempt, so multiple
+  // Payment rows (one per attempt) can share an orderId. Order.payments is the
+  // one-to-many relation; the @unique here was the inconsistency.
+  orderId           String
+  order             Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  provider          String        @default("RAZORPAY")
+  providerPaymentId String?
+  providerOrderId   String?
+  amount            Int           // Stored in cents
+  currency          String        @default("INR")
+  status            String        @default("PENDING") // PENDING | CAPTURED | FAILED | REFUNDED | PARTIALLY_REFUNDED
+  method            String?
+  webhookVerified   Boolean       @default(false)
+  webhookPayload    String?       // JSON string (always stringified)
+  failedAt          DateTime?
+  failureReason     String?
+  metadata          String?       // JSON string
+  createdAt         DateTime      @default(now())
+  capturedAt        DateTime?
+  updatedAt         DateTime      @updatedAt
+
+  refunds           Refund[]
+
+  @@index([orderId])
+  @@index([providerPaymentId])
+  @@index([providerOrderId])
+  @@map("payments")
+}
+
+model Refund {
+  id               String    @id @default(cuid())
+  paymentId        String
+  payment          Payment   @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  providerRefundId String?
+  amount           Int       // Stored in cents
+  reason           String?
+  status           String    @default("PENDING") // PENDING | PROCESSED | FAILED
+  processedAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([paymentId])
+  @@index([providerRefundId])
+  @@map("refunds")
+}
+
+model Shipment {
+  id              String          @id @default(cuid())
+  orderId         String
+  order           Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  supplierId      String?
+  supplier        Supplier?       @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  carrier         String?
+  trackingNumber  String?
+  trackingUrl     String?
+  status          String          @default("PENDING") // PENDING | IN_TRANSIT | DELIVERED | FAILED | RETURNED
+  shippedAt       DateTime?
+  deliveredAt     DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  trackingEvents  TrackingEvent[]
+
+  @@index([orderId])
+  @@index([trackingNumber])
+  @@index([supplierId])
+  @@map("shipments")
+}
+
+model TrackingEvent {
+  id           String        @id @default(cuid())
+  shipmentId   String
+  shipment     Shipment      @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  status       String
+  location     String?
+  description  String
+  timestamp    DateTime
+  source       String        @default("MANUAL") // SUPPLIER | CARRIER | MANUAL
+
+  @@index([shipmentId])
+  @@map("tracking_events")
+}
+
+model Review {
+  id                  String       @id @default(cuid())
+  productId           String
+  product             Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId              String
+  user                User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orderId             String?
+  order               Order?       @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  rating              Int
+  title               String?
+  content             String?
+  isVerifiedPurchase  Boolean      @default(false)
+  status              String       @default("PENDING") // PENDING | APPROVED | REJECTED
+  adminNotes          String?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  @@unique([userId, productId])
+  @@index([productId])
+  @@index([userId])
+  @@index([status])
+  @@index([orderId])
+  @@map("reviews")
+}
+
+model Wishlist {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  items     WishlistItem[]
+
+  @@map("wishlists")
+}
+
+model WishlistItem {
+  id          String   @id @default(cuid())
+  wishlistId  String
+  wishlist    Wishlist @relation(fields: [wishlistId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId   String?
+  variant     ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+
+  @@unique([wishlistId, productId, variantId])
+  @@index([wishlistId])
+  @@index([productId])
+  @@index([variantId])
+  @@map("wishlist_items")
+}
+
+model ShippingMethod {
+  id                    String   @id @default(cuid())
+  name                  String
+  code                  String   @unique
+  description           String?
+  baseCost              Int      // Stored in cents
+  perItemCost           Int?     // Stored in cents
+  perKgCost             Int?     // Stored in cents
+  freeShippingThreshold Int?     // Stored in cents
+  minOrderAmount        Int?     // Stored in cents
+  maxOrderAmount        Int?     // Stored in cents
+  estimatedDays         Int
+  currency              String   @default("INR")
+  isActive              Boolean  @default(true)
+  sortOrder             Int      @default(0)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  zones                 ShippingZoneMethod[]
+
+  @@map("shipping_methods")
+}
+
+model ShippingZone {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+
+  countries ShippingZoneCountry[]
+  methods   ShippingZoneMethod[]
+
+  @@map("shipping_zones")
+}
+
+model ShippingZoneCountry {
+  id       String       @id @default(cuid())
+  zoneId   String
+  zone     ShippingZone @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  code     String       // ISO 3166-1 alpha-2
+
+  @@unique([zoneId, code])
+  @@map("shipping_zone_countries")
+}
+
+model ShippingZoneMethod {
+  id           String         @id @default(cuid())
+  zoneId       String
+  zone         ShippingZone   @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  methodId     String
+  method       ShippingMethod @relation(fields: [methodId], references: [id], onDelete: Cascade)
+
+  @@unique([zoneId, methodId])
+  @@map("shipping_zone_methods")
+}
+
+model Coupon {
+  id            String      @id @default(cuid())
+  code          String      @unique
+  name          String
+  type          String      // PERCENTAGE | FIXED_AMOUNT | FREE_SHIPPING
+  value         Int         // Stored in cents or percentage (e.g., 10 = 10% or 1000 cents)
+  minOrderAmount Int?       // Stored in cents
+  maxDiscount   Int?        // Stored in cents
+  usageLimit    Int?
+  usedCount     Int         @default(0)
+  validFrom     DateTime
+  validUntil    DateTime
+  isActive      Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+
+  @@index([code])
+  @@index([validFrom, validUntil])
+  @@map("coupons")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  entityType String
+  entityId  String
+  oldData   String?  // JSON string
+  newData   String?  // JSON string
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}

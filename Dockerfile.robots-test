@@ -1,0 +1,4 @@
+﻿FROM alpine:3.20
+WORKDIR /test
+COPY apps/web/public/robots.txt /test/robots.txt
+RUN echo "--- FILE INSIDE DOCKER BUILD CONTEXT ---" && cat /test/robots.txt

@@ -1,0 +1,82 @@
+# AUREVO API Load Test — Artillery config
+# Target: http://localhost:4000/api
+# Run: npx artillery run apps/api/test/load-test.yml
+#
+# Phases:
+#   1. Warm-up: 5 VUs for 30s — ensure connections are established
+#   2. Ramp: ramp to 20 VUs over 30s — test connection pooling
+#   3. Sustained: 20 VUs for 60s — steady-state throughput
+#   4. Spike: ramp to 50 VUs for 15s — burst capacity
+#   5. Cool-down: drop to 5 VUs for 15s — recovery
+#
+# Total duration: ~150s. Endpoints tested:
+#   - GET /health (read-only, no auth)
+#   - GET /products (catalog listing with pagination)
+#   - GET /categories (category tree)
+#   - POST /auth/register (write — rate-limited 3/hr)
+#   - POST /auth/login (write — rate-limited 5/min)
+#   - GET /products/:slug (detail by slug)
+
+config:
+  target: "http://localhost:4000/api"
+  phases:
+    - name: "Warm-up"
+      duration: 30
+      arrivalRate: 5
+    - name: "Ramp"
+      duration: 30
+      rampTo: 20
+    - name: "Sustained"
+      duration: 60
+      arrivalRate: 20
+    - name: "Spike"
+      duration: 15
+      rampTo: 50
+    - name: "Cool-down"
+      duration: 15
+      arrivalRate: 5
+  defaults:
+    headers:
+      Content-Type: "application/json"
+  ensure:
+    p95: 500
+    maxErrorRate: 5
+
+scenarios:
+  - name: "Catalog browsing"
+    weight: 70
+    flow:
+      - loop:
+          - get:
+              url: "/health"
+          - get:
+              url: "/products?page=1&limit=12&status=ACTIVE"
+          - get:
+              url: "/categories"
+        count: 3
+
+  - name: "Product detail"
+    weight: 20
+    flow:
+      - think: 1
+      - get:
+          url: "/products?status=ACTIVE&limit=1"
+          capture:
+            - json: "$.data[0].slug"
+              as: "slug"
+      - get:
+          url: "/products/{{ slug }}"
+
+  - name: "Auth flow"
+    weight: 10
+    flow:
+      - think: 2
+      - post:
+          url: "/auth/login"
+          json:
+            email: "loadtest-{{ $loopIteration }}@aurevo.test"
+            password: "LoadTest123!"
+          expect:
+            - statusCode:
+                - 200
+                - 401

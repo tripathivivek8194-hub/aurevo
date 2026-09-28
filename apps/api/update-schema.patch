@@ -1,0 +1,7 @@
+--- prisma/schema.prisma
++++ prisma/schema.prisma
+@@ -250,2 +250,4 @@
+   code          String       @unique // ALIEXPRESS | INDIAMART
++  contact       String?      
++  notes         String?      
+   apiConfig     String       // Encrypted JSON

@@ -1,0 +1,48 @@
+# ============================================================================
+# AUREVO monorepo — .dockerignore
+# Keeps the build context small and, critically, keeps secrets and local
+# databases out of any image. The Dockerfiles only ever COPY specific paths,
+# but this protects against accidental `COPY . .` and shrinks the context.
+# ============================================================================
+
+# VCS
+.git
+.gitignore
+
+# Dependencies
+node_modules
+**/node_modules
+
+# Build output & caches
+dist
+**/dist
+build
+**/build
+.turbo
+**/.turbo
+*.tsbuildinfo
+
+# Env & secrets — NEVER bake into an image
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+
+# Local databases (never ship the dev SQLite db)
+*.db
+*.db-journal
+*.db-wal
+*.db.bak
+**/prisma/dev.db*
+
+# Tests & coverage
+coverage
+**/coverage
+**/__tests__
+**/*.spec.ts
+**/*.e2e-spec.ts
+
+# Logs
+*.log
+npm-debug.log*
