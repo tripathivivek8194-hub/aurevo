@@ -3,10 +3,14 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { OrderStatus, UserRole } from '@aurevo/shared/types';
+import { EmailService } from '../email/email.service';
 
 @Injectable()
 export class OrdersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly emailService: EmailService,
+  ) {}
 
   async findAll(params: {
     page?: number;
@@ -158,7 +162,10 @@ export class OrdersService {
   }
 
   async updateStatus(id: string, dto: UpdateOrderStatusDto) {
-    const order = await this.prisma.order.findUnique({ where: { id } });
+    const order = await this.prisma.order.findUnique({
+      where: { id },
+      include: { user: { select: { email: true, emailOrderUpdates: true } } },
+    });
     if (!order) {
       throw new NotFoundException('Order not found');
     }
@@ -220,6 +227,13 @@ export class OrdersService {
 
       return result;
     });
+
+    if (order.user?.emailOrderUpdates) {
+      void this.emailService.sendOrderStatusUpdate(order.user.email, {
+        orderNumber: order.orderNumber,
+        status: dto.status,
+      });
+    }
 
     return updated;
   }

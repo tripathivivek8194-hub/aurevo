@@ -4,6 +4,7 @@ import { UsersService } from './users.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { AddressDto } from './dto/address.dto';
+import { UpdateNotificationPreferencesDto } from './dto/update-notification-preferences.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -27,6 +28,15 @@ export class UsersController {
   @ApiOperation({ summary: 'Update current user profile' })
   async updateProfile(@CurrentUser('sub') userId: string, @Body() dto: UpdateProfileDto) {
     return this.usersService.updateProfile(userId, dto);
+  }
+
+  @Patch('me/notification-preferences')
+  @ApiOperation({ summary: 'Update notification preferences for the current user' })
+  async updateNotificationPreferences(
+    @CurrentUser('sub') userId: string,
+    @Body() dto: UpdateNotificationPreferencesDto,
+  ) {
+    return this.usersService.updateNotificationPreferences(userId, dto);
   }
 
   @Post('me/change-password')

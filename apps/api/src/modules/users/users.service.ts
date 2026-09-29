@@ -5,6 +5,7 @@ import { UserRole } from '@aurevo/shared/types';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { AddressDto } from './dto/address.dto';
+import { UpdateNotificationPreferencesDto } from './dto/update-notification-preferences.dto';
 
 @Injectable()
 export class UsersService {
@@ -21,6 +22,8 @@ export class UsersService {
         role: true,
         isActive: true,
         emailVerified: true,
+        emailOrderUpdates: true,
+        emailPromotions: true,
         createdAt: true,
         updatedAt: true,
         addresses: true,
@@ -76,6 +79,26 @@ export class UsersService {
         createdAt: true,
         updatedAt: true,
       },
+    });
+  }
+
+  async updateNotificationPreferences(userId: string, dto: UpdateNotificationPreferencesDto) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(dto.emailOrderUpdates !== undefined
+          ? { emailOrderUpdates: dto.emailOrderUpdates }
+          : {}),
+        ...(dto.emailPromotions !== undefined
+          ? { emailPromotions: dto.emailPromotions }
+          : {}),
+      },
+      select: { emailOrderUpdates: true, emailPromotions: true },
     });
   }
 

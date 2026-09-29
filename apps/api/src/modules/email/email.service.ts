@@ -15,6 +15,11 @@ export interface OrderEmailData {
   items: OrderEmailItem[];
 }
 
+export interface OrderStatusEmailData {
+  orderNumber: string;
+  status: string;
+}
+
 /**
  * Very small token interpolation for the email templates. Only `{{token}}`
  * placeholders are replaced. Substituted values are HTML-escaped by default so
@@ -133,6 +138,18 @@ export class EmailService {
       },
     );
     await this.send(to, `AUREVO Order ${order.orderNumber}`, html);
+  }
+
+  async sendOrderStatusUpdate(to: string, order: OrderStatusEmailData): Promise<void> {
+    const orderUrl = `${this.webUrl}/orders?orderNumber=${encodeURIComponent(order.orderNumber)}`;
+    const html = [
+      '<div style="font-family:Arial,sans-serif;color:#2b2620;line-height:1.6">',
+      '<h2>Your AUREVO order has been updated</h2>',
+      `<p>Order <strong>${escapeHtml(order.orderNumber)}</strong> is now <strong>${escapeHtml(order.status.replace(/_/g, ' '))}</strong>.</p>`,
+      `<p><a href="${escapeHtml(orderUrl)}">View your order</a></p>`,
+      '</div>',
+    ].join('');
+    await this.send(to, `AUREVO order ${order.orderNumber} update`, html);
   }
 
   private async send(to: string, subject: string, html: string): Promise<void> {
