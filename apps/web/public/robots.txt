@@ -9,4 +9,4 @@ Disallow: /checkout
 Disallow: /login
 Disallow: /register
 
-Sitemap: https://www.aurevo.buzz/sitemap.xml
+Sitemap: https://aurevo.buzz/sitemap.xml
