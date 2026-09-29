@@ -425,6 +425,10 @@ export class AuthService {
           tokenId: rt.tokenId,
           expiresAt: rt.expiresAt,
         })),
+        // A customer can reset their password more than once. Earlier reset
+        // requests may already have revoked these same session tokens, which
+        // is safe and should not turn a valid reset into a server error.
+        skipDuplicates: true,
       }),
     ]);
 

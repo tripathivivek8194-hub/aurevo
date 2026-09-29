@@ -33,10 +33,10 @@ export class RegisterDto {
   // M1: 8-72 chars, at least one lowercase, uppercase, digit and special
   // character. Fully anchored so the quantifier bounds the whole string.
   @Matches(
-    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,72}$/,
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9\s])[^\s]{8,72}$/,
     {
       message:
-        'Password must be 8-72 characters and include an uppercase letter, a lowercase letter, a number, and a special character (@$!%*?&)',
+        'Password must be 8-72 characters and include an uppercase letter, a lowercase letter, a number, and a special character.',
     },
   )
   password: string;

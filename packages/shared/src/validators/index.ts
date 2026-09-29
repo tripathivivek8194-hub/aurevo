@@ -21,8 +21,8 @@ export const registerSchema = z.object({
   password: z
     .string()
     .regex(
-      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,72}$/,
-      'Password must be 8-72 characters and include an uppercase letter, a lowercase letter, a number, and a special character (@$!%*?&)',
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9\s])[^\s]{8,72}$/,
+      'Password must be 8-72 characters and include an uppercase letter, a lowercase letter, a number, and a special character.',
     ),
   firstName: z.string().trim().min(1, 'First name is required').max(50).transform(sanitizeName),
   lastName: z.string().trim().min(1, 'Last name is required').max(50).transform(sanitizeName),
