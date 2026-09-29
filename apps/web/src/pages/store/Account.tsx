@@ -16,6 +16,11 @@ import { api } from '../../lib/api';
 import { formatMoney, formatDate, initialsof } from '../../lib/format';
 import type { Address, OrderStats } from '../../lib/storefront';
 
+type NotificationPreferences = {
+  emailOrderUpdates: boolean;
+  emailPromotions: boolean;
+};
+
 /* ------------------------------------------------------------------ */
 /* Inline address form                                                 */
 /* ------------------------------------------------------------------ */
@@ -258,9 +263,6 @@ export function Account() {
   const [editingAddress, setEditingAddress] =
     useState<Address | undefined>(undefined);
 
-  const [emailOrderUpdates, setEmailOrderUpdates] = useState(true);
-  const [emailPromotions, setEmailPromotions] = useState(false);
-
   useSeo({
     title: 'My Account | AUREVO',
     description:
@@ -278,6 +280,24 @@ export function Account() {
     queryKey: ['addresses'],
     queryFn: () =>
       api.get<Address[]>('/users/me/addresses').then((r) => r.data),
+  });
+
+  const preferencesQuery = useQuery({
+    queryKey: ['notification-preferences'],
+    queryFn: () =>
+      api.get<NotificationPreferences>('/users/me').then((r) => ({
+        emailOrderUpdates: r.data.emailOrderUpdates,
+        emailPromotions: r.data.emailPromotions,
+      })),
+    enabled: Boolean(user),
+  });
+
+  const preferencesMutation = useMutation({
+    mutationFn: (preferences: Partial<NotificationPreferences>) =>
+      api.patch<NotificationPreferences>('/users/me/notification-preferences', preferences),
+    onSuccess: (response) => {
+      queryClient.setQueryData(['notification-preferences'], response.data);
+    },
   });
 
   const deleteAddressMutation = useMutation({
@@ -369,6 +389,10 @@ export function Account() {
 
   const stats = statsQuery.data;
   const addresses = addressesQuery.data ?? [];
+  const preferences = preferencesQuery.data ?? {
+    emailOrderUpdates: true,
+    emailPromotions: false,
+  };
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
@@ -893,18 +917,25 @@ export function Account() {
               </p>
             </div>
 
-            <Alert variant="info" className="mt-5">
-              Email notifications are coming soon. These preferences
-              will take effect once email delivery is enabled.
-            </Alert>
+            <p className="mt-4 text-sm text-[var(--color-text-secondary)]">
+              Your choices save automatically. Order updates are sent only when you keep them enabled.
+            </p>
+
+            {preferencesMutation.isError && (
+              <Alert variant="error" className="mt-5">
+                We could not save your notification preferences. Please try again.
+              </Alert>
+            )}
 
             <div className="mt-5 divide-y divide-[var(--color-border)] rounded-2xl border border-[var(--color-border)] bg-[var(--color-background-primary)]">
               <div className="p-4 sm:p-5">
                 <Switch
                   label="Order status updates"
-                  checked={emailOrderUpdates}
-                  onChange={setEmailOrderUpdates}
-                  disabled
+                  checked={preferences.emailOrderUpdates}
+                  onChange={(emailOrderUpdates) =>
+                    preferencesMutation.mutate({ emailOrderUpdates })
+                  }
+                  disabled={preferencesQuery.isLoading || preferencesMutation.isPending}
                 />
                 <p className="mt-2 pl-0 text-xs text-[var(--color-text-tertiary)] sm:pl-0">
                   Receive updates about your orders and deliveries.
@@ -914,9 +945,11 @@ export function Account() {
               <div className="p-4 sm:p-5">
                 <Switch
                   label="Promotions and new arrivals"
-                  checked={emailPromotions}
-                  onChange={setEmailPromotions}
-                  disabled
+                  checked={preferences.emailPromotions}
+                  onChange={(emailPromotions) =>
+                    preferencesMutation.mutate({ emailPromotions })
+                  }
+                  disabled={preferencesQuery.isLoading || preferencesMutation.isPending}
                 />
                 <p className="mt-2 text-xs text-[var(--color-text-tertiary)]">
                   Hear about new products and special offers.
