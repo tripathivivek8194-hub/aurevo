@@ -10,9 +10,9 @@ import { useEffect } from 'react';
  * (e.g. og:image from a previous product page). No external dependency —
  * react-helmet-async is not needed for a client-rendered app.
  *
- * Canonical URLs are emitted only when a real site URL is configured
- * (VITE_SITE_URL). Without one — the current no-domain state — the tag is
- * omitted entirely so a broken `localhost` canonical never poisons an index.
+ * Canonical URLs use VITE_SITE_URL when configured, otherwise AUREVO's verified
+ * production domain. This keeps production builds indexable even if the build
+ * environment omits the optional variable.
  */
 
 export interface SeoConfig {
@@ -27,11 +27,13 @@ export interface SeoConfig {
   noindex?: boolean;
 }
 
-const SITE_URL = (import.meta.env.VITE_SITE_URL as string | undefined)?.replace(/\/+$/, '') ?? '';
+// AUREVO is served from this verified production domain. Keeping this fallback
+// prevents production builds from silently losing canonical URLs when the
+// optional Cloudflare build variable has not been configured.
+const SITE_URL = ((import.meta.env.VITE_SITE_URL as string | undefined) || 'https://aurevo.buzz').replace(/\/+$/, '');
 
 /**
- * Build an absolute canonical URL from VITE_SITE_URL, or `undefined` when no
- * domain is configured (the canonical tag is then omitted — see useSeo).
+ * Build an absolute canonical URL from the configured or verified site domain.
  * Pass the result straight into `useSeo({ canonical })`.
  */
 export function canonicalFor(path: string): string | undefined {
@@ -110,8 +112,8 @@ export function useSeo(config: SeoConfig): void {
       removeMeta('property', 'og:image');
     }
 
-    // Canonical: only when the caller supplied one AND a site URL exists.
-    if (canonical && SITE_URL) {
+    // Canonical: emit the route-level primary URL whenever the page supplies it.
+    if (canonical) {
       upsertCanonical(canonical);
     } else {
       removeCanonical();
