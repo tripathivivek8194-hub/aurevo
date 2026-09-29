@@ -453,7 +453,7 @@ export function StoreLayout() {
               )}
 
               {/* Desktop account actions */}
-              <div className="hidden items-center gap-2 xl:flex">
+              <div className="hidden items-center gap-2 md:flex">
                 {authenticated ? (
                   <>
                     {isAdmin(user?.role) && (
@@ -521,7 +521,7 @@ export function StoreLayout() {
                 id="store-menu-toggle"
                 aria-controls="mobile-menu-panel"
                 onClick={() => setMobileMenuOpen((open) => !open)}
-                className="rounded-full p-2.5 text-[var(--color-text-secondary)] transition-all hover:bg-[var(--color-background-hover)] hover:text-[var(--color-text-primary)] xl:hidden"
+                className="rounded-full p-2.5 text-[var(--color-text-secondary)] transition-all hover:bg-[var(--color-background-hover)] hover:text-[var(--color-text-primary)] md:hidden"
               >
                 {mobileMenuOpen ? (
                   <svg
@@ -565,7 +565,7 @@ export function StoreLayout() {
         {mobileMenuOpen && (
           <div
             id="mobile-menu-panel"
-            className="border-t border-[var(--color-border)] bg-[var(--color-background-primary)]/95 max-h-[calc(100dvh-4.5rem)] overflow-y-auto p-4 shadow-2xl backdrop-blur-xl xl:hidden"
+            className="border-t border-[var(--color-border)] bg-[var(--color-background-primary)]/95 max-h-[calc(100dvh-4.5rem)] overflow-y-auto p-4 shadow-2xl backdrop-blur-xl md:hidden"
           >
             <div className="mx-auto max-w-7xl">
               {/* Navigation */}
