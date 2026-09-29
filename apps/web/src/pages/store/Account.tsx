@@ -251,6 +251,8 @@ export function Account() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [resendingVerification, setResendingVerification] = useState(false);
+  const [verificationNotice, setVerificationNotice] = useState<string | null>(null);
 
   const [addressFormOpen, setAddressFormOpen] = useState(false);
   const [editingAddress, setEditingAddress] =
@@ -344,6 +346,24 @@ export function Account() {
       );
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    setVerificationNotice(null);
+    setResendingVerification(true);
+
+    try {
+      await api.post('/auth/resend-verification', { email: user.email });
+      setVerificationNotice('A fresh verification link has been sent to your email address.');
+    } catch (err) {
+      setVerificationNotice(
+        err instanceof Error
+          ? err.message
+          : 'We could not send the verification email. Please try again.',
+      );
+    } finally {
+      setResendingVerification(false);
     }
   };
 
@@ -551,8 +571,31 @@ export function Account() {
                   <p className="mt-2 text-sm font-medium text-[var(--color-text-primary)]">
                     {user.emailVerified ? 'Yes' : 'No'}
                   </p>
+                  {!user.emailVerified && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void handleResendVerification()}
+                      disabled={resendingVerification}
+                      className="mt-4 w-full"
+                    >
+                      {resendingVerification
+                        ? 'Sending…'
+                        : 'Resend verification email'}
+                    </Button>
+                  )}
                 </div>
               </div>
+
+              {verificationNotice && (
+                <Alert
+                  variant={verificationNotice.startsWith('A fresh') ? 'success' : 'error'}
+                  className="mt-4"
+                >
+                  {verificationNotice}
+                </Alert>
+              )}
             )}
           </section>
 
