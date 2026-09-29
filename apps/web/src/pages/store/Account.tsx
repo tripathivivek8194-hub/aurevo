@@ -554,7 +554,8 @@ export function Account() {
                 </div>
               </form>
             ) : (
-              <div className="mt-6 grid grid-cols-1 gap-3 border-t border-[var(--color-border)] pt-6 sm:grid-cols-2">
+              <>
+                <div className="mt-6 grid grid-cols-1 gap-3 border-t border-[var(--color-border)] pt-6 sm:grid-cols-2">
                 <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-background-primary)] p-4">
                   <p className="text-xs uppercase tracking-wider text-[var(--color-text-tertiary)]">
                     Member since
@@ -586,16 +587,17 @@ export function Account() {
                     </Button>
                   )}
                 </div>
-              </div>
+                </div>
 
-              {verificationNotice && (
-                <Alert
-                  variant={verificationNotice.startsWith('A fresh') ? 'success' : 'error'}
-                  className="mt-4"
-                >
-                  {verificationNotice}
-                </Alert>
-              )}
+                {verificationNotice && (
+                  <Alert
+                    variant={verificationNotice.startsWith('A fresh') ? 'success' : 'error'}
+                    className="mt-4"
+                  >
+                    {verificationNotice}
+                  </Alert>
+                )}
+              </>
             )}
           </section>
 
