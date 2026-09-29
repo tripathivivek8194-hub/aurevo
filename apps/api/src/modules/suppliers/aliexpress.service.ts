@@ -621,6 +621,111 @@ export class AliExpressService {
     });
   }
 
+  /**
+   * Refresh stock for products which were imported from AliExpress.  This only
+   * changes the local inventory records; it never creates supplier orders or
+   * changes a product that is not explicitly linked to AliExpress.
+   */
+  async syncInventory(): Promise<{
+    success: boolean;
+    updated: number;
+    skipped: number;
+    message?: string;
+  }> {
+    const adapter = await this.buildAdapter();
+    const supplier = await this.suppliersService.ensureAliExpressSupplier();
+    const products = await this.prisma.product.findMany({
+      where: {
+        supplierId: supplier.id,
+        supplierProductId: { not: null },
+      },
+      include: { variants: true },
+    });
+
+    let updated = 0;
+    let skipped = 0;
+
+    for (const product of products) {
+      try {
+        const sourceProductId = product.supplierProductId!;
+        const inventory = await adapter.getInventory(sourceProductId);
+
+        if (product.variants.length === 0) {
+          // A product without AUREVO variants represents every supplier SKU,
+          // so use their total available quantity instead of an arbitrary SKU.
+          const quantity = inventory.variants.reduce(
+            (total, item) => total + Math.max(0, Number(item.quantity) || 0),
+            0,
+          );
+          await this.prisma.inventory.upsert({
+            where: { variantId: null },
+            create: {
+              productId: product.id,
+              variantId: null,
+              quantity,
+              supplierStock: quantity,
+              lastSyncedAt: new Date(),
+              syncStatus: 'SYNCED',
+            },
+            update: {
+              quantity,
+              supplierStock: quantity,
+              lastSyncedAt: new Date(),
+              syncStatus: 'SYNCED',
+            },
+          });
+          updated++;
+          continue;
+        }
+
+        let matchedVariants = 0;
+        const skuPrefix = `AE-${sourceProductId}-V`;
+        for (const variant of product.variants) {
+          // AliExpress imports use AE-<productId>-V<supplierSkuId>. Do not
+          // guess for manually edited SKUs: leave an unmatched variant alone.
+          if (!variant.sku.startsWith(skuPrefix)) continue;
+          const supplierVariantId = variant.sku.slice(skuPrefix.length);
+          const match = inventory.variants.find(
+            (item) => item.variantId === supplierVariantId,
+          );
+          if (!match) continue;
+
+          const quantity = Math.max(0, Number(match.quantity) || 0);
+          await this.prisma.inventory.upsert({
+            where: { variantId: variant.id },
+            create: {
+              productId: product.id,
+              variantId: variant.id,
+              quantity,
+              supplierStock: quantity,
+              lastSyncedAt: new Date(),
+              syncStatus: 'SYNCED',
+            },
+            update: {
+              quantity,
+              supplierStock: quantity,
+              lastSyncedAt: new Date(),
+              syncStatus: 'SYNCED',
+            },
+          });
+          matchedVariants++;
+        }
+
+        if (matchedVariants > 0) updated++;
+        else skipped++;
+      } catch {
+        // One unavailable supplier product must never stop the remaining sync.
+        skipped++;
+      }
+    }
+
+    await this.prisma.supplier.update({
+      where: { id: supplier.id },
+      data: { syncEnabled: true, lastSyncedAt: new Date() },
+    });
+    return { success: true, updated, skipped };
+  }
+
   /** List feed picker data. Safe on failure — honest, never fabricated. */
   async listFeeds(): Promise<AliExpressFeedListResult> {
     let adapter: AliExpressAdapter;

@@ -6,6 +6,8 @@ import { AliExpressService } from './aliexpress.service';
 import { CJDropshippingController } from './cjdropshipping.controller';
 import { CJDropshippingWebhookController } from './cjdropshipping.webhook.controller';
 import { CJDropshippingService } from './cjdropshipping.service';
+import { SupplierStockSyncService } from './supplier-stock-sync.service';
+import { SupplierStockSyncController } from './supplier-stock-sync.controller';
 import { PrismaModule } from '../../database/prisma.module';
 
 @Module({
@@ -15,8 +17,14 @@ import { PrismaModule } from '../../database/prisma.module';
     AliExpressController,
     CJDropshippingController,
     CJDropshippingWebhookController,
+    SupplierStockSyncController,
   ],
-  providers: [SuppliersService, AliExpressService, CJDropshippingService],
-  exports: [SuppliersService, AliExpressService, CJDropshippingService],
+  providers: [
+    SuppliersService,
+    AliExpressService,
+    CJDropshippingService,
+    SupplierStockSyncService,
+  ],
+  exports: [SuppliersService, AliExpressService, CJDropshippingService, SupplierStockSyncService],
 })
 export class SuppliersModule {}

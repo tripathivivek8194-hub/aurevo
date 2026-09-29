@@ -216,4 +216,15 @@ export class AliExpressController {
   retryJob(@Param() params: JobIdParamDto) {
     return this.aliExpressService.retryFailed(params.id);
   }
+
+  /** Refresh stock for already linked AliExpress products. Admin only. */
+  @Post('inventory/sync')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Sync AliExpress inventory for linked products (Admin only)' })
+  syncInventory() {
+    return this.aliExpressService.syncInventory();
+  }
 }
