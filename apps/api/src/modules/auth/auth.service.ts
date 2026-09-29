@@ -425,6 +425,9 @@ export class AuthService {
           tokenId: rt.tokenId,
           expiresAt: rt.expiresAt,
         })),
+        // Repeated password resets can encounter session tokens already
+        // revoked by an earlier reset. That is safe, so ignore duplicates.
+        skipDuplicates: true,
       }),
     ]);
 
