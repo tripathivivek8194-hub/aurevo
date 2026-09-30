@@ -336,7 +336,6 @@ export function Products() {
             label="What's included / pack size"
             value={form.packageContents}
             onChange={(v) => setForm({ ...form, packageContents: v })}
-            placeholder="Example: Set of 2 — 2 storage containers with lids."
           />
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">

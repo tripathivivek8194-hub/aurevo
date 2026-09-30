@@ -86,7 +86,7 @@ export function Dashboard() {
             <CardHeader>
               <CardTitle as="h2">Revenue · last 30 days</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="overflow-x-auto">
               {data.charts.revenueByDay.length === 0 ? (
                 <p className="text-sm text-[var(--color-text-secondary)]">No revenue data yet.</p>
               ) : (
@@ -110,7 +110,7 @@ export function Dashboard() {
             <CardHeader>
               <CardTitle as="h2">Recent orders</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="overflow-x-auto">
               <Table
                 data={data.recentOrders}
                 keyExtractor={(o) => o.id}
@@ -131,7 +131,7 @@ export function Dashboard() {
               <CardHeader>
                 <CardTitle as="h2">Top products</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="overflow-x-auto">
                 <Table
                   data={data.topProducts}
                   keyExtractor={(p) => p.productId}
@@ -150,7 +150,7 @@ export function Dashboard() {
               <CardHeader>
                 <CardTitle as="h2">Top customers</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="overflow-x-auto">
                 <Table
                   data={data.topCustomers}
                   keyExtractor={(c) => c.userId}
