@@ -630,6 +630,8 @@ export class AliExpressService {
     success: boolean;
     updated: number;
     skipped: number;
+    failedFetches: number;
+    unmatchedVariants: number;
     message?: string;
   }> {
     const adapter = await this.buildAdapter();
@@ -644,11 +646,21 @@ export class AliExpressService {
 
     let updated = 0;
     let skipped = 0;
+    let failedFetches = 0;
+    let unmatchedVariants = 0;
 
     for (const product of products) {
       try {
         const sourceProductId = product.supplierProductId!;
-        const inventory = await adapter.getInventory(sourceProductId);
+        const metadata = this.parseMetadata(product.metadata);
+        const shipToCountry =
+          typeof metadata.country === 'string' && /^[A-Z]{2}$/i.test(metadata.country)
+            ? metadata.country.toUpperCase()
+            : 'IN';
+        const inventory = await adapter.getDropshippingInventory(
+          sourceProductId,
+          shipToCountry,
+        );
 
         if (product.variants.length === 0) {
           // A product without AUREVO variants represents every supplier SKU,
@@ -716,10 +728,14 @@ export class AliExpressService {
         }
 
         if (matchedVariants > 0) updated++;
-        else skipped++;
+        else {
+          skipped++;
+          unmatchedVariants++;
+        }
       } catch {
         // One unavailable supplier product must never stop the remaining sync.
         skipped++;
+        failedFetches++;
       }
     }
 
@@ -727,7 +743,7 @@ export class AliExpressService {
       where: { id: supplier.id },
       data: { syncEnabled: true, lastSyncedAt: new Date() },
     });
-    return { success: true, updated, skipped };
+    return { success: true, updated, skipped, failedFetches, unmatchedVariants };
   }
 
   /** List feed picker data. Safe on failure — honest, never fabricated. */
@@ -796,6 +812,17 @@ export class AliExpressService {
   }
 
   // --- Import Job Engine (resumable, page-by-page) --------------------------------
+
+  /** Metadata is admin-editable legacy data, so malformed JSON must not stop a stock sync. */
+  private parseMetadata(raw: string | null | undefined): Record<string, unknown> {
+    if (!raw) return {};
+    try {
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
 
   /** Parse the JSON `failedIds` column or return an empty list. */
   private parseFailedIds(raw: string | null): string[] {

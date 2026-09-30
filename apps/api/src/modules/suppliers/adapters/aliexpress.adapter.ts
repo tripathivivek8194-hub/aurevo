@@ -656,6 +656,30 @@ export class AliExpressAdapter implements SupplierAdapter {
     };
   }
 
+  /**
+   * Stock refreshes for imported dropshipping products must use the DS detail
+   * API, not the affiliate detail API. The latter is not granted to every
+   * dropshipping application and caused valid imported products to be skipped.
+   */
+  async getDropshippingInventory(
+    supplierProductId: string,
+    shipToCountry: string,
+  ): Promise<InventoryResult> {
+    const product = await this.getProductDetail(supplierProductId, shipToCountry, {
+      targetCurrency: 'INR',
+      targetLanguage: 'EN',
+    });
+
+    return {
+      productId: supplierProductId,
+      variants: (product.skus ?? []).map((sku) => ({
+        variantId: sku.sku_id,
+        quantity: Math.max(0, Number(sku.sku_stock) || 0),
+        available: Math.max(0, Number(sku.sku_stock) || 0) > 0,
+      })),
+    };
+  }
+
   async getPrice(supplierProductId: string, variantIds?: string[]): Promise<PriceResult> {
     const product = await this.getProduct(supplierProductId);
 

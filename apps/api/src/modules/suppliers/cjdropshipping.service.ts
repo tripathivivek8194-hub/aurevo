@@ -640,24 +640,34 @@ export class CJDropshippingService {
   async syncInventory(): Promise<{ success: boolean; updated: number; skipped: number; message?: string }> {
     const adapter = await this.buildAdapter();
     const supplier = await this.suppliersService.ensureCJSupplier();
-    const mappings = await this.prisma.supplierProduct.findMany({
-      where: { supplierId: supplier.id },
-      include: {
-        product: { include: { variants: { include: { inventory: true } }, inventory: true } },
+    // CJ imports store their supplier link directly on Product.  Older imports
+    // did not create SupplierProduct rows, so reading that table leaves every
+    // imported CJ product untracked even though it is linked correctly.
+    const products = await this.prisma.product.findMany({
+      where: {
+        supplierProductId: { not: null },
+        OR: [
+          { supplierId: supplier.id },
+          // Backward compatibility for catalog rows imported before the
+          // supplier relation was persisted. The CJ SKU prefix is the stable
+          // import identity, not a user-entered guess.
+          { sku: { startsWith: 'CJ-' } },
+        ],
       },
+      include: { variants: { include: { inventory: true } }, inventory: true },
     });
     let updated = 0;
     let skipped = 0;
-    for (const mapping of mappings) {
+    for (const product of products) {
       try {
-        const inv = await adapter.getInventory(mapping.supplierProductId);
+        const inv = await adapter.getInventory(product.supplierProductId!);
         // Product-level inventory (no variants).
-        if (mapping.product.variants.length === 0) {
+        if (product.variants.length === 0) {
           const qty = inv.variants[0]?.quantity ?? 0;
           await this.prisma.inventory.upsert({
             where: { variantId: null },
             create: {
-              productId: mapping.productId,
+              productId: product.id,
               variantId: null,
               quantity: qty,
               supplierStock: qty,
@@ -675,14 +685,14 @@ export class CJDropshippingService {
           });
         } else {
           // Map each variant's stock by matching CJ sku code (variant sku suffix).
-          for (const variant of mapping.product.variants) {
+          for (const variant of product.variants) {
             const skuCode = variant.sku.replace(/^CJ-.*-V/, '');
             const match = inv.variants.find((v) => v.variantId === skuCode);
             if (!match) continue;
             await this.prisma.inventory.upsert({
               where: { variantId: variant.id },
               create: {
-                productId: mapping.productId,
+                productId: product.id,
                 variantId: variant.id,
                 quantity: match.quantity,
                 supplierStock: match.quantity,
@@ -699,6 +709,13 @@ export class CJDropshippingService {
               },
             });
           }
+        }
+        // Keep older successful imports linked for all later scheduled runs.
+        if (product.supplierId !== supplier.id) {
+          await this.prisma.product.update({
+            where: { id: product.id },
+            data: { supplierId: supplier.id },
+          });
         }
         updated++;
       } catch {
