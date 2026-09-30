@@ -112,7 +112,7 @@ export function isProductAvailable(product: ProductSummary): boolean {
 export function availabilityLabel(product: ProductSummary): string {
   const rows = product.inventory ?? [];
   const supplierStockVerified = rows.some(
-    (row) => row.syncStatus === 'SUCCESS' && row.supplierStock != null,
+    (row) => (row.syncStatus === 'SUCCESS' || row.syncStatus === 'SYNCED') && row.supplierStock != null,
   );
   return product.supplierId && !supplierStockVerified ? 'Available' : 'In stock';
 }
