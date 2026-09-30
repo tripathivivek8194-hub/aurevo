@@ -95,6 +95,12 @@ export class UpdateProductDto {
   @IsOptional()
   metadata?: Record<string, any>;
 
+  @ApiProperty({ example: 'Set of 2 — 2 storage containers with lids', required: false })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  packageContents?: string;
+
   @ApiProperty({ example: 100, required: false })
   @IsOptional()
   @IsInt()

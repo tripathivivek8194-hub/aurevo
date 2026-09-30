@@ -56,11 +56,41 @@ export class ProductsService {
     return pct;
   }
 
-  /** Strip the cost field from a result before returning to storefront consumers. */
+  private parseMetadata(raw: string | null | undefined): Record<string, unknown> {
+    if (!raw) return {};
+    try {
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+
+  private packageContents(raw: string | null | undefined): string | undefined {
+    const value = this.parseMetadata(raw).packageContents;
+    return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+  }
+
+  private mergedMetadata(
+    existing: string | null | undefined,
+    supplied?: Record<string, any>,
+    packageContents?: string,
+  ): string | null {
+    const metadata = { ...this.parseMetadata(existing), ...(supplied ?? {}) };
+    if (packageContents !== undefined) {
+      const cleaned = packageContents.trim();
+      if (cleaned) metadata.packageContents = cleaned;
+      else delete metadata.packageContents;
+    }
+    return Object.keys(metadata).length ? JSON.stringify(metadata) : null;
+  }
+
+  /** Keep only customer-safe fields when returning a product to the storefront. */
   private stripCost<T extends Record<string, unknown>>(obj: T): T {
-    if (!obj || typeof obj !== 'object' || !('cost' in obj)) return obj;
-    const { cost: _, ...rest } = obj as any;
-    return rest as T;
+    if (!obj || typeof obj !== 'object') return obj;
+    const { cost: _, metadata, ...rest } = obj as any;
+    const packageContents = this.packageContents(metadata);
+    return (packageContents ? { ...rest, packageContents } : rest) as T;
   }
 
   /**
@@ -75,7 +105,7 @@ export class ProductsService {
     const hasCost = typeof cost === 'number' && Number.isFinite(cost) && cost > 0;
     const hasPrice = typeof basePrice === 'number' && Number.isFinite(basePrice) && basePrice > 0;
     const marginPct = hasCost && hasPrice ? validateMargin(cost, basePrice).marginPct : null;
-    return { ...obj, marginPct };
+    return { ...obj, packageContents: this.packageContents(anyRow?.metadata), marginPct };
   }
 
   async findAll(
@@ -261,7 +291,7 @@ export class ProductsService {
         supplierId: dto.supplierId,
         supplierProductId: dto.supplierProductId,
         supplierVariantId: dto.supplierVariantId,
-        metadata: dto.metadata ? JSON.stringify(dto.metadata) : undefined,
+        metadata: this.mergedMetadata(undefined, dto.metadata, dto.packageContents) ?? undefined,
         images: dto.images?.map((img, index) => ({
           url: img.url,
           alt: img.alt,
@@ -382,7 +412,19 @@ export class ProductsService {
       });
     }
 
-    const { initialQuantity, lowStockThreshold, trackQuantity, allowBackorder, ...productData } = dto;
+    const {
+      initialQuantity,
+      lowStockThreshold,
+      trackQuantity,
+      allowBackorder,
+      metadata,
+      packageContents,
+      ...productData
+    } = dto;
+
+    if (metadata !== undefined || packageContents !== undefined) {
+      (productData as any).metadata = this.mergedMetadata(product.metadata, metadata, packageContents);
+    }
 
     const updated = await this.prisma.product.update({
       where: { id },
