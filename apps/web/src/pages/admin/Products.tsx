@@ -14,7 +14,7 @@ interface Variant { id: string; name: string; sku: string; price: number; isActi
 interface Image { id: string; url: string; alt?: string | null; isPrimary?: boolean; }
 interface Product {
   id: string; name: string; slug: string; sku: string; basePrice: number; currency: string;
-  status: string; isFeatured?: boolean; description?: string; categoryId?: string;
+  status: string; isFeatured?: boolean; description?: string; packageContents?: string | null; categoryId?: string;
   cost?: number | null;  // paise — admin reads only; the storefront never sees it
   marginPct?: number | null;
   variants?: Variant[]; images?: Image[];
@@ -29,14 +29,14 @@ const statusVariant: Record<string, 'default' | 'success' | 'warning' | 'error' 
 };
 
 interface FormState {
-  name: string; slug: string; sku: string; description: string; basePrice: string;
+  name: string; slug: string; sku: string; description: string; packageContents: string; basePrice: string;
   compareAtPrice: string; currency: string; status: string; categoryId: string;
   isFeatured: boolean; trackQuantity: boolean; allowBackorder: boolean;
   initialQuantity: string; lowStockThreshold: string;
   cost: string;  // NEW: landed cost in paise/INR
 }
 const emptyForm: FormState = {
-  name: '', slug: '', sku: '', description: '', basePrice: '', compareAtPrice: '',
+  name: '', slug: '', sku: '', description: '', packageContents: '', basePrice: '', compareAtPrice: '',
   currency: 'INR', status: 'DRAFT', categoryId: '', isFeatured: false,
   trackQuantity: true, allowBackorder: false, initialQuantity: '', lowStockThreshold: '',
   cost: '',
@@ -100,7 +100,7 @@ export function Products() {
     setForm(
       p
         ? {
-            name: p.name, slug: p.slug, sku: p.sku, description: p.description ?? '',
+            name: p.name, slug: p.slug, sku: p.sku, description: p.description ?? '', packageContents: p.packageContents ?? '',
             basePrice: String(p.basePrice), compareAtPrice: '', currency: p.currency,
             status: p.status, categoryId: p.categoryId ?? '',
             isFeatured: !!p.isFeatured,
@@ -132,7 +132,7 @@ export function Products() {
     }
     const payload = {
       name: form.name, slug: form.slug || undefined, sku: form.sku,
-      description: form.description, basePrice: Number(form.basePrice),
+      description: form.description, packageContents: form.packageContents, basePrice: Number(form.basePrice),
       cost: costPayload,
       compareAtPrice: form.compareAtPrice ? Number(form.compareAtPrice) : undefined,
       currency: form.currency, status: form.status, categoryId: form.categoryId,
@@ -332,6 +332,12 @@ export function Products() {
             <LabeledInput label="Currency" value={form.currency} onChange={(v) => setForm({ ...form, currency: v })} required />
           </div>
           <LabeledTextarea label="Description" value={form.description} onChange={(v) => setForm({ ...form, description: v })} />
+          <LabeledTextarea
+            label="What's included / pack size"
+            value={form.packageContents}
+            onChange={(v) => setForm({ ...form, packageContents: v })}
+            placeholder="Example: Set of 2 — 2 storage containers with lids."
+          />
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
               <Label htmlFor="p-status">Status</Label>

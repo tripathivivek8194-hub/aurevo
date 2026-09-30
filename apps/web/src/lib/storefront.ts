@@ -56,6 +56,7 @@ export interface ProductSummary {
   sku: string;
   description?: string | null;
   shortDescription?: string | null;
+  packageContents?: string | null;
   basePrice: number;
   compareAtPrice?: number | null;
   currency: string;

@@ -807,6 +807,15 @@ export function ProductDetail() {
                 </div>
               )}
 
+              {product.packageContents?.trim() && (
+                <div className="mt-6 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
+                  <p className="text-sm font-semibold text-[var(--color-text-primary)]">What's included</p>
+                  <p className="mt-2 whitespace-pre-line text-sm leading-7 text-[var(--color-text-secondary)]">
+                    {product.packageContents.trim()}
+                  </p>
+                </div>
+              )}
+
               {/* Variant selectors */}
               {attributeKeys.length > 0 && (
                 <div className="mt-7 space-y-6 border-t border-[var(--color-border)] pt-6">
