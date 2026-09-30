@@ -626,7 +626,7 @@ export class AliExpressService {
    * changes the local inventory records; it never creates supplier orders or
    * changes a product that is not explicitly linked to AliExpress.
    */
-  async syncInventory(): Promise<{
+  async syncInventory(maxProducts = 20): Promise<{
     success: boolean;
     updated: number;
     skipped: number;
@@ -636,13 +636,24 @@ export class AliExpressService {
   }> {
     const adapter = await this.buildAdapter();
     const supplier = await this.suppliersService.ensureAliExpressSupplier();
-    const products = await this.prisma.product.findMany({
+    // A full catalog can contain thousands of supplier SKUs.  A hosted
+    // scheduler request has a finite lifetime, so select the least recently
+    // checked products and let successive runs rotate through the catalog.
+    const candidates = await this.prisma.product.findMany({
       where: {
         supplierId: supplier.id,
         supplierProductId: { not: null },
       },
-      include: { variants: true },
+      include: { variants: { include: { inventory: true } }, inventory: true },
     });
+    const lastSyncAt = (product: typeof candidates[number]) => Math.max(
+      0,
+      ...product.inventory.map((inventory) => inventory.lastSyncedAt?.getTime() ?? 0),
+      ...product.variants.map((variant) => variant.inventory?.lastSyncedAt?.getTime() ?? 0),
+    );
+    const products = candidates
+      .sort((left, right) => lastSyncAt(left) - lastSyncAt(right))
+      .slice(0, maxProducts);
 
     let updated = 0;
     let skipped = 0;
@@ -662,35 +673,35 @@ export class AliExpressService {
           shipToCountry,
         );
 
-        if (product.variants.length === 0) {
-          // A product without AUREVO variants represents every supplier SKU,
-          // so use their total available quantity instead of an arbitrary SKU.
-          const quantity = inventory.variants.reduce(
-            (total, item) => total + Math.max(0, Number(item.quantity) || 0),
-            0,
-          );
-          await this.prisma.inventory.upsert({
-            where: { variantId: null },
-            create: {
-              productId: product.id,
-              variantId: null,
-              quantity,
-              supplierStock: quantity,
-              trackQuantity: true,
-              lastSyncedAt: new Date(),
-              syncStatus: 'SYNCED',
-            },
-            update: {
-              quantity,
-              supplierStock: quantity,
-              trackQuantity: true,
-              lastSyncedAt: new Date(),
-              syncStatus: 'SYNCED',
-            },
-          });
-          updated++;
-          continue;
-        }
+        // Keep one product-level inventory record even when variants exist.
+        // This is the record shown in the admin inventory table; without it,
+        // a successfully synced variant can still look "Not tracked" there.
+        const totalQuantity = inventory.variants.reduce(
+          (total, item) => total + Math.max(0, Number(item.quantity) || 0),
+          0,
+        );
+        await this.prisma.inventory.upsert({
+          where: { variantId: null },
+          create: {
+            productId: product.id,
+            variantId: null,
+            quantity: totalQuantity,
+            supplierStock: totalQuantity,
+            trackQuantity: true,
+            lastSyncedAt: new Date(),
+            syncStatus: 'SYNCED',
+          },
+          update: {
+            quantity: totalQuantity,
+            supplierStock: totalQuantity,
+            trackQuantity: true,
+            lastSyncedAt: new Date(),
+            syncStatus: 'SYNCED',
+          },
+        });
+        updated++;
+
+        if (product.variants.length === 0) continue;
 
         let matchedVariants = 0;
         const skuPrefix = `AE-${sourceProductId}-V`;
