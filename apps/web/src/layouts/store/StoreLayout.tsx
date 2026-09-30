@@ -335,6 +335,12 @@ export function StoreLayout() {
               className="group flex shrink-0 items-center gap-2"
               aria-label="AUREVO home"
             >
+              <img
+                src="/brand/aurevo-mark-v1.png"
+                alt=""
+                aria-hidden="true"
+                className="h-8 w-8 shrink-0 object-contain sm:h-9 sm:w-9"
+              />
               <span className="text-xl font-bold tracking-[-0.04em] text-[var(--color-text-primary)] transition-colors group-hover:text-[var(--color-interactive-primary)] sm:text-2xl">
                 AUREVO
               </span>
@@ -737,6 +743,12 @@ export function StoreLayout() {
             {/* Brand */}
             <div className="col-span-2 max-w-sm lg:col-span-1">
               <Link to="/" className="inline-flex items-center gap-2">
+                <img
+                  src="/brand/aurevo-mark-v1.png"
+                  alt=""
+                  aria-hidden="true"
+                  className="h-9 w-9 shrink-0 object-contain"
+                />
                 <span className="text-2xl font-bold tracking-[-0.04em] text-[var(--color-text-primary)]">
                   AUREVO
                 </span>
