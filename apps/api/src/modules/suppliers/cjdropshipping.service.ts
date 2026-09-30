@@ -684,25 +684,27 @@ export class CJDropshippingService {
         );
         // The admin list displays product-level inventory, so update it for
         // every product, including products that also have variants.
-        await this.prisma.inventory.upsert({
-          where: { variantId: null },
-          create: {
-            productId: product.id,
-            variantId: null,
-            quantity: totalQuantity,
-            supplierStock: totalQuantity,
-            trackQuantity: true,
-            lastSyncedAt: new Date(),
-            syncStatus: 'SYNCED',
-          },
-          update: {
-            quantity: totalQuantity,
-            supplierStock: totalQuantity,
-            trackQuantity: true,
-            lastSyncedAt: new Date(),
-            syncStatus: 'SYNCED',
-          },
+        const productInventory = await this.prisma.inventory.findFirst({
+          where: { productId: product.id, variantId: null },
+          select: { id: true },
         });
+        const stockUpdate = {
+          quantity: totalQuantity,
+          supplierStock: totalQuantity,
+          trackQuantity: true,
+          lastSyncedAt: new Date(),
+          syncStatus: 'SYNCED',
+        };
+        if (productInventory) {
+          await this.prisma.inventory.update({
+            where: { id: productInventory.id },
+            data: stockUpdate,
+          });
+        } else {
+          await this.prisma.inventory.create({
+            data: { productId: product.id, variantId: null, ...stockUpdate },
+          });
+        }
         if (product.variants.length > 0) {
           // Map each variant's stock by matching CJ sku code (variant sku suffix).
           for (const variant of product.variants) {

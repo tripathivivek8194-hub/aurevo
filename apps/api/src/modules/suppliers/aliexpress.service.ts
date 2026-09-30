@@ -680,25 +680,27 @@ export class AliExpressService {
           (total, item) => total + Math.max(0, Number(item.quantity) || 0),
           0,
         );
-        await this.prisma.inventory.upsert({
-          where: { variantId: null },
-          create: {
-            productId: product.id,
-            variantId: null,
-            quantity: totalQuantity,
-            supplierStock: totalQuantity,
-            trackQuantity: true,
-            lastSyncedAt: new Date(),
-            syncStatus: 'SYNCED',
-          },
-          update: {
-            quantity: totalQuantity,
-            supplierStock: totalQuantity,
-            trackQuantity: true,
-            lastSyncedAt: new Date(),
-            syncStatus: 'SYNCED',
-          },
+        const productInventory = await this.prisma.inventory.findFirst({
+          where: { productId: product.id, variantId: null },
+          select: { id: true },
         });
+        const stockUpdate = {
+          quantity: totalQuantity,
+          supplierStock: totalQuantity,
+          trackQuantity: true,
+          lastSyncedAt: new Date(),
+          syncStatus: 'SYNCED',
+        };
+        if (productInventory) {
+          await this.prisma.inventory.update({
+            where: { id: productInventory.id },
+            data: stockUpdate,
+          });
+        } else {
+          await this.prisma.inventory.create({
+            data: { productId: product.id, variantId: null, ...stockUpdate },
+          });
+        }
         updated++;
 
         if (product.variants.length === 0) continue;
