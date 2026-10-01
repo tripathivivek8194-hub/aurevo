@@ -55,6 +55,8 @@ export function Products() {
   const [imageUrl, setImageUrl] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [repairingPrices, setRepairingPrices] = useState(false);
+  const [priceRepairMessage, setPriceRepairMessage] = useState<string | null>(null);
 
   // ── Cost / margin readout ────────────────────────────────────────────────
   // The cost input is in ₹ (whole rupees) because that's how sellers think;
@@ -217,18 +219,56 @@ export function Products() {
     }
   };
 
+  const repairZeroPrices = async () => {
+    setRepairingPrices(true);
+    setPriceRepairMessage(null);
+    try {
+      const result = await api
+        .post<{ productsPriced: number; variantsPriced: number; skippedWithoutCost: number }>(
+          '/admin/products/pricing/repair-zero-prices',
+        )
+        .then((response) => response.data);
+      setPriceRepairMessage(
+        `Priced ${result.productsPriced} products and ${result.variantsPriced} variants using the 30% margin rule.` +
+          (result.skippedWithoutCost > 0
+            ? ` ${result.skippedWithoutCost} items still need supplier cost data.`
+            : ''),
+      );
+      await listQuery.refetch();
+    } catch (err) {
+      setPriceRepairMessage(
+        err instanceof ApiError ? err.message : 'Could not repair zero prices.',
+      );
+    } finally {
+      setRepairingPrices(false);
+    }
+  };
+
   const meta = listQuery.data?.meta;
   const rows = listQuery.data?.data ?? [];
 
   return (
     <div className="space-y-6">
-      <header className="flex items-center justify-between">
+      <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Products</h1>
           <p className="text-sm text-[var(--color-text-secondary)]">{meta ? `${meta.total} products` : 'Loading…'}</p>
         </div>
-        <Button variant="primary" onClick={openCreate}>New product</Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            onClick={() => void repairZeroPrices()}
+            disabled={repairingPrices}
+          >
+            {repairingPrices ? 'Fixing prices…' : 'Fix zero prices'}
+          </Button>
+          <Button variant="primary" onClick={openCreate}>New product</Button>
+        </div>
       </header>
+
+      {priceRepairMessage && (
+        <Alert variant="info">{priceRepairMessage}</Alert>
+      )}
 
       <div className="flex flex-wrap gap-4">
         <Input

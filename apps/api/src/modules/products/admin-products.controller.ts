@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { ProductsService } from './products.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -58,6 +58,13 @@ export class AdminProductsController {
       },
       { admin: true },
     );
+  }
+
+  @Post('pricing/repair-zero-prices')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Admin: set safe 30% margin prices on zero-priced products with known supplier cost' })
+  async repairZeroPrices() {
+    return this.productsService.repairZeroPrices();
   }
 
   @Get(':id')

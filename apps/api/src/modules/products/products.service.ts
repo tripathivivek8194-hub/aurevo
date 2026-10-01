@@ -5,7 +5,7 @@ import { UpdateProductDto } from './dto/update-product.dto';
 import { CreateVariantDto } from './dto/create-variant.dto';
 import { UpdateVariantDto } from './dto/update-variant.dto';
 import { ProductStatus } from '@aurevo/shared/types';
-import { slugify, validateMargin, MIN_MARGIN_PCT } from '@aurevo/shared';
+import { computeMinSellPrice, slugify, validateMargin, MIN_MARGIN_PCT } from '@aurevo/shared';
 
 @Injectable()
 export class ProductsService {
@@ -480,6 +480,89 @@ export class ProductsService {
     }
 
     return { ...updated, marginPct };
+  }
+
+  /**
+   * Repair imported catalog rows whose selling price is zero even though the
+   * supplier has supplied a landed cost.  Never guesses at a price: records
+   * with missing/zero cost are deliberately left alone for supplier review.
+   *
+   * Imported pricing follows the same 30% minimum-margin rule used across the
+   * product service. Existing non-zero prices are never overwritten.
+   */
+  async repairZeroPrices(): Promise<{
+    productsPriced: number;
+    variantsPriced: number;
+    skippedWithoutCost: number;
+  }> {
+    const [priceable, skippedWithoutCost] = await Promise.all([
+      this.prisma.product.findMany({
+        where: {
+          cost: { gt: 0 },
+          OR: [
+            { basePrice: { lte: 0 } },
+            { variants: { some: { isActive: true, price: { lte: 0 } } } },
+          ],
+        },
+        select: {
+          id: true,
+          cost: true,
+          basePrice: true,
+          variants: {
+            where: { isActive: true, price: { lte: 0 } },
+            select: { id: true },
+          },
+        },
+      }),
+      this.prisma.product.count({
+        where: {
+          AND: [
+            { OR: [{ cost: null }, { cost: { lte: 0 } }] },
+            {
+              OR: [
+                { basePrice: { lte: 0 } },
+                { variants: { some: { isActive: true, price: { lte: 0 } } } },
+              ],
+            },
+          ],
+        },
+      }),
+    ]);
+
+    const operations: any[] = priceable.flatMap((product) => {
+      const sellPrice = computeMinSellPrice(product.cost ?? 0);
+      if (sellPrice === null) return [];
+
+      const updates: any[] = [];
+      if (product.basePrice <= 0) {
+        updates.push(
+          this.prisma.product.update({
+            where: { id: product.id },
+            data: { basePrice: sellPrice },
+          }),
+        );
+      }
+
+      for (const variant of product.variants) {
+        updates.push(
+          this.prisma.productVariant.update({
+            where: { id: variant.id },
+            data: { price: sellPrice },
+          }),
+        );
+      }
+      return updates;
+    });
+
+    if (operations.length > 0) {
+      await this.prisma.$transaction(operations);
+    }
+
+    return {
+      productsPriced: priceable.filter((product) => product.basePrice <= 0).length,
+      variantsPriced: priceable.reduce((total, product) => total + product.variants.length, 0),
+      skippedWithoutCost,
+    };
   }
 
   async delete(id: string) {

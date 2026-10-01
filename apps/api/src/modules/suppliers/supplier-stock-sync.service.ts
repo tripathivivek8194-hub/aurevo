@@ -2,6 +2,7 @@ import { ConflictException, Injectable, Logger, OnApplicationBootstrap } from '@
 import { ConfigService } from '@nestjs/config';
 import { AliExpressService } from './aliexpress.service';
 import { CJDropshippingService } from './cjdropshipping.service';
+import { ProductsService } from '../products/products.service';
 
 /**
  * Runs each supplier's existing inventory refresh in one controlled job. It is
@@ -15,6 +16,7 @@ export class SupplierStockSyncService implements OnApplicationBootstrap {
   constructor(
     private readonly aliExpressService: AliExpressService,
     private readonly cjService: CJDropshippingService,
+    private readonly productsService: ProductsService,
     private readonly configService: ConfigService,
   ) {}
 
@@ -40,6 +42,7 @@ export class SupplierStockSyncService implements OnApplicationBootstrap {
     try {
       const [aliexpress, cjdropshipping] = await Promise.allSettled([this.aliExpressService.syncInventory(), this.cjService.syncInventory()]);
 
+      const pricing = await this.productsService.repairZeroPrices();
       const result = {
         success: aliexpress.status === 'fulfilled' || cjdropshipping.status === 'fulfilled',
         aliexpress:
@@ -60,6 +63,7 @@ export class SupplierStockSyncService implements OnApplicationBootstrap {
                 skipped: 0,
                 message: 'CJdropshipping sync could not run.',
               },
+        pricing,
       };
       return result;
     } finally {
@@ -103,6 +107,12 @@ export class SupplierStockSyncService implements OnApplicationBootstrap {
 
         // Give supplier rate-limit windows a moment between batches.
         await new Promise((resolve) => setTimeout(resolve, 1_000));
+      }
+      const pricing = await this.productsService.repairZeroPrices();
+      if (pricing.productsPriced || pricing.variantsPriced) {
+        this.logger.log(
+          `Repaired ${pricing.productsPriced} zero-priced products and ${pricing.variantsPriced} zero-priced variants.`,
+        );
       }
       this.logger.log(`Full supplier catalog stock sync finished; checked ${processed} products.`);
     } finally {

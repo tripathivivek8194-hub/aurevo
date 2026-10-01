@@ -9,9 +9,10 @@ import { CJDropshippingService } from './cjdropshipping.service';
 import { SupplierStockSyncService } from './supplier-stock-sync.service';
 import { SupplierStockSyncController } from './supplier-stock-sync.controller';
 import { PrismaModule } from '../../database/prisma.module';
+import { ProductsModule } from '../products/products.module';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, ProductsModule],
   controllers: [
     SuppliersController,
     AliExpressController,

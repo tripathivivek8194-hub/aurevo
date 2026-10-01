@@ -63,6 +63,51 @@ describe('ProductsService — pagination caps', () => {
   });
 });
 
+describe('ProductsService — zero-price repair', () => {
+  it('prices only products with a landed cost and leaves missing-cost rows untouched', async () => {
+    const prisma: any = {
+      product: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'priced-product',
+            cost: 7000,
+            basePrice: 0,
+            variants: [{ id: 'zero-variant' }],
+          },
+        ]),
+        count: jest.fn().mockResolvedValue(4),
+        update: jest.fn().mockReturnValue({ kind: 'product-update' }),
+      },
+      productVariant: {
+        update: jest.fn().mockReturnValue({ kind: 'variant-update' }),
+      },
+      $transaction: jest.fn().mockResolvedValue([]),
+    };
+    const service = new ProductsService(prisma);
+
+    const result = await service.repairZeroPrices();
+
+    // ₹70 cost → ₹100 selling price (30% margin floor), stored in paise.
+    expect(prisma.product.update).toHaveBeenCalledWith({
+      where: { id: 'priced-product' },
+      data: { basePrice: 10000 },
+    });
+    expect(prisma.productVariant.update).toHaveBeenCalledWith({
+      where: { id: 'zero-variant' },
+      data: { price: 10000 },
+    });
+    expect(prisma.$transaction).toHaveBeenCalledWith([
+      { kind: 'product-update' },
+      { kind: 'variant-update' },
+    ]);
+    expect(result).toEqual({
+      productsPriced: 1,
+      variantsPriced: 1,
+      skippedWithoutCost: 4,
+    });
+  });
+});
+
 describe('ProductsService — update() inventory routing', () => {
   function build() {
     const prisma: any = {
