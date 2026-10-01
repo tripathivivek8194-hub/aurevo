@@ -37,7 +37,7 @@ export function Home() {
           ? {
               '@id': origin,
               url: origin,
-              logo: `${origin}favicon.svg`,
+              logo: `${origin}aurevo-logo.png`,
             }
           : {}),
       },

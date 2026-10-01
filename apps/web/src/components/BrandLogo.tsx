@@ -1,3 +1,5 @@
+import aurevoLogo from '../assets/aurevo-logo.png';
+
 type BrandLogoProps = {
   className?: string;
   descriptor?: string;
@@ -22,9 +24,9 @@ const sizes = {
 /**
  * Permanent AUREVO brand lockup.
  *
- * The mark is inline SVG rather than a runtime image URL, so it is bundled
- * directly into every storefront build and cannot disappear because an
- * uploaded/local asset was omitted from a deployment.
+ * The official mark is imported from the source tree rather than loaded from
+ * an external or temporary URL. Vite fingerprints and bundles it into every
+ * storefront build, and the wordmark remains visible as a graceful fallback.
  */
 export function BrandLogo({
   className = '',
@@ -38,19 +40,12 @@ export function BrandLogo({
       className={`inline-flex shrink-0 items-center gap-2.5 ${className}`}
       aria-label={descriptor ? `AUREVO ${descriptor}` : 'AUREVO'}
     >
-      <svg
+      <img
+        src={aurevoLogo}
+        alt=""
         aria-hidden="true"
-        viewBox="0 0 64 64"
-        className={`${selectedSize.mark} shrink-0 drop-shadow-[0_6px_14px_rgba(99,102,241,0.28)]`}
-      >
-        <path d="M32 4 59 25 32 60 5 25Z" fill="#6d28d9" />
-        <path d="M32 4 47 25H17Z" fill="#8b5cf6" />
-        <path d="M5 25h54L32 60Z" fill="#4f46e5" />
-        <path
-          d="M32 14c2.2 8 7.8 13.6 16 16-8.2 2.4-13.8 8-16 16-2.2-8-7.8-13.6-16-16 8.2-2.4 13.8-8 16-16Z"
-          fill="var(--color-background-primary)"
-        />
-      </svg>
+        className={`${selectedSize.mark} shrink-0 object-contain drop-shadow-[0_6px_14px_rgba(99,102,241,0.28)]`}
+      />
 
       <span
         className={`${selectedSize.word} font-bold leading-none tracking-[-0.045em] text-[var(--color-text-primary)]`}
