@@ -10,6 +10,7 @@ import {
 import { useSeo } from '../../hooks/useSeo';
 import { isAdmin, useAuthStore } from '../../stores/auth';
 import { GoogleSignInButton } from '../../components/GoogleSignInButton';
+import { BrandLogo } from '../../components/BrandLogo';
 
 export function Login() {
   const navigate = useNavigate();
@@ -83,9 +84,9 @@ export function Login() {
           <div className="relative z-10 flex w-full flex-col justify-between p-12 xl:p-16">
             <Link
               to="/"
-              className="inline-flex w-fit items-center text-2xl font-semibold tracking-[0.22em] text-[var(--color-text-primary)]"
+              className="inline-flex w-fit items-center"
             >
-              AUREVO
+              <BrandLogo size="lg" />
             </Link>
 
             <div className="max-w-xl">
@@ -146,9 +147,9 @@ export function Login() {
             <div className="mb-10 lg:hidden">
               <Link
                 to="/"
-                className="text-xl font-semibold tracking-[0.2em] text-[var(--color-text-primary)]"
+                className="inline-flex items-center"
               >
-                AUREVO
+                <BrandLogo />
               </Link>
             </div>
 

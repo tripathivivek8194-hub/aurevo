@@ -6,6 +6,7 @@ import { isAdmin, useAuthStore } from '../../stores/auth';
 import { useCartStore } from '../../stores/cart';
 import { api } from '../../lib/api';
 import type { CategorySummary } from '../../lib/storefront';
+import { BrandLogo } from '../../components/BrandLogo';
 
 /**
  * Customer-facing storefront shell: sticky header (brand, category nav, search,
@@ -119,16 +120,10 @@ export function StoreLayout() {
             {/* Brand */}
             <Link
               to="/"
-              className="group flex shrink-0 items-center gap-2"
+              className="group flex shrink-0 items-center"
               aria-label="AUREVO home"
             >
-              <span className="text-xl font-bold tracking-[-0.04em] text-[var(--color-text-primary)] transition-colors group-hover:text-[var(--color-interactive-primary)] sm:text-2xl">
-                AUREVO
-              </span>
-
-              <span className="hidden border-l border-[var(--color-border)] pl-2 text-[10px] font-medium uppercase tracking-[0.2em] text-[var(--color-text-tertiary)] sm:block">
-                Store
-              </span>
+              <BrandLogo descriptor="Store" />
             </Link>
 
             {/* Desktop category navigation */}
@@ -574,14 +569,8 @@ export function StoreLayout() {
           <div className="grid grid-cols-1 gap-12 lg:grid-cols-[1.5fr_1fr_1fr_1fr]">
             {/* Brand */}
             <div className="max-w-sm">
-              <Link to="/" className="inline-flex items-center gap-2">
-                <span className="text-2xl font-bold tracking-[-0.04em] text-[var(--color-text-primary)]">
-                  AUREVO
-                </span>
-
-                <span className="border-l border-[var(--color-border)] pl-2 text-[10px] font-medium uppercase tracking-[0.2em] text-[var(--color-text-tertiary)]">
-                  Store
-                </span>
+              <Link to="/" className="inline-flex items-center">
+                <BrandLogo descriptor="Store" size="lg" />
               </Link>
 
               <p className="mt-5 text-sm leading-6 text-[var(--color-text-secondary)]">
