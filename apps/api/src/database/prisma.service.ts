@@ -18,7 +18,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   async onModuleInit() {
     // Log queries in development
     if (process.env.NODE_ENV === 'development') {
-      // @ts-expect-error - Prisma query event typing
+      // @ts-ignore - Prisma query event typing varies with the generated client
       this.$on('query', (e: { query: string; params: string; duration: number }) => {
         this.logger.debug(`Query: ${e.query} | Params: ${e.params} | Duration: ${e.duration}ms`);
       });

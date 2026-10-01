@@ -32,13 +32,20 @@ export class AnalyticsService {
       return acc;
     }, {} as Record<string, { date: string; revenue: number; orders: number; aov: number }>);
 
-    Object.values(daily).forEach(d => {
+    const dailyRows = Object.values(daily) as Array<{
+      date: string;
+      revenue: number;
+      orders: number;
+      aov: number;
+    }>;
+
+    dailyRows.forEach(d => {
       d.aov = d.orders > 0 ? d.revenue / d.orders : 0;
     });
 
     return {
       summary: { totalRevenue, totalOrders, avgOrderValue },
-      daily: Object.values(daily).sort((a, b) => a.date.localeCompare(b.date)),
+      daily: dailyRows.sort((a, b) => a.date.localeCompare(b.date)),
     };
   }
 

@@ -175,7 +175,13 @@ export class AdminService {
       return acc;
     }, {} as Record<string, { date: string; revenue: number; orders: number }>);
 
-    return Object.values(grouped).sort((a, b) => a.date.localeCompare(b.date));
+    const reportRows = Object.values(grouped) as Array<{
+      date: string;
+      revenue: number;
+      orders: number;
+    }>;
+
+    return reportRows.sort((a, b) => a.date.localeCompare(b.date));
   }
 
   async getProductReport() {
@@ -194,7 +200,10 @@ export class AdminService {
       _sum: { totalPrice: true, quantity: true },
     });
 
-    const revenueMap = new Map(productRevenue.map(p => [p.productId, p]));
+    type ProductRevenue = (typeof productRevenue)[number];
+    const revenueMap = new Map<string, ProductRevenue>(
+      productRevenue.map(p => [p.productId, p] as [string, ProductRevenue]),
+    );
 
     return products.map(product => {
       const rev = revenueMap.get(product.id);
