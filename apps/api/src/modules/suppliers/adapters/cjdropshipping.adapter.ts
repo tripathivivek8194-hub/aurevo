@@ -628,7 +628,9 @@ export class CJDropshippingAdapter implements SupplierAdapter {
       inventory?.totalInventory ??
       inventory?.storageNum ??
       inventory?.cjInventoryNum ??
-      inventory?.cjInventory;
+      inventory?.cjInventory ??
+      inventory?.stock ??
+      inventory?.availableStock;
     const quantity = Number(value);
     if (!Number.isFinite(quantity) || quantity < 0) {
       throw new SupplierApiError(
