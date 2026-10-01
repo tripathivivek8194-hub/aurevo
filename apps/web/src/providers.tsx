@@ -1,6 +1,7 @@
 import { useEffect, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuthStore } from './stores/auth';
+import { CookieConsent } from './components/CookieConsent';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -22,6 +23,7 @@ export function Providers({ children }: { children: ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <AuthInit />
       {children}
+      <CookieConsent />
     </QueryClientProvider>
   );
 }

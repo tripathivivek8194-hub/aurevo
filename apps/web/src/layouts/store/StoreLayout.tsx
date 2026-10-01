@@ -7,6 +7,7 @@ import { useCartStore } from '../../stores/cart';
 import { api } from '../../lib/api';
 import type { CategorySummary } from '../../lib/storefront';
 import { BrandLogo } from '../../components/BrandLogo';
+import { openCookieSettings } from '../../components/CookieConsent';
 
 /**
  * Customer-facing storefront shell: sticky header (brand, category nav, search,
@@ -721,9 +722,16 @@ export function StoreLayout() {
               © {new Date().getFullYear()} AUREVO. All rights reserved.
             </p>
 
-            <p className="text-xs text-[var(--color-text-tertiary)]">
-              Curated. Simple. Yours.
-            </p>
+            <div className="flex items-center gap-4">
+              <button
+                type="button"
+                onClick={openCookieSettings}
+                className="text-xs text-[var(--color-text-tertiary)] underline underline-offset-4 transition-colors hover:text-[var(--color-text-primary)]"
+              >
+                Cookie settings
+              </button>
+              <p className="text-xs text-[var(--color-text-tertiary)]">Curated. Simple. Yours.</p>
+            </div>
           </div>
         </div>
       </footer>
