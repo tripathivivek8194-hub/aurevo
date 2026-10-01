@@ -137,11 +137,7 @@ export class CJDropshippingService {
 
   // -- capability model (honest — SUPPORTED only after live verification) ------
 
-  private buildCapabilities(opts: {
-    configured: boolean;
-    hasToken: boolean;
-    verified: boolean;
-  }): SupplierCapability[] {
+  private buildCapabilities(opts: { configured: boolean; hasToken: boolean; verified: boolean }): SupplierCapability[] {
     const ops: Array<[string, string]> = [
       ['PRODUCT_SEARCH', 'Product search / list'],
       ['PRODUCT_DETAIL', 'Product detail'],
@@ -167,7 +163,12 @@ export class CJDropshippingService {
       status = SupplierCapabilityStatus.UNVERIFIED;
       note = 'Implemented but not yet confirmed against the live CJ API.';
     }
-    return ops.map(([operation, label]) => ({ operation, label, status, note }));
+    return ops.map(([operation, label]) => ({
+      operation,
+      label,
+      status,
+      note,
+    }));
   }
 
   // -- public operations -------------------------------------------------------
@@ -246,11 +247,7 @@ export class CJDropshippingService {
       return {
         success: false,
         message:
-          err instanceof BadRequestException
-            ? 'CJdropshipping is not configured.'
-            : err instanceof SupplierApiError
-              ? err.message
-              : 'CJ verification failed.',
+          err instanceof BadRequestException ? 'CJdropshipping is not configured.' : err instanceof SupplierApiError ? err.message : 'CJ verification failed.',
       };
     }
   }
@@ -292,7 +289,11 @@ export class CJDropshippingService {
     }
   }
 
-  async listCategories(): Promise<{ configured: boolean; categories: Array<{ id: string; name: string }>; error?: string }> {
+  async listCategories(): Promise<{
+    configured: boolean;
+    categories: Array<{ id: string; name: string }>;
+    error?: string;
+  }> {
     try {
       const adapter = await this.buildAdapter();
       const categories = await adapter.listProductCategories();
@@ -407,9 +408,12 @@ export class CJDropshippingService {
     // active state: never clobber admin-owned variant sell prices.
     const upsertVariants = (productId: string) => {
       const data = variants.map((v, i) => ({
-        name: v.attributes && Object.keys(v.attributes).length
-          ? Object.entries(v.attributes).map(([k, val]) => `${k}: ${val}`).join(' / ')
-          : `SKU ${i + 1}`,
+        name:
+          v.attributes && Object.keys(v.attributes).length
+            ? Object.entries(v.attributes)
+                .map(([k, val]) => `${k}: ${val}`)
+                .join(' / ')
+            : `SKU ${i + 1}`,
         sku: `CJ-${p.id}-V${v.id}`,
         price: computeMinSellPrice(cents(v.price)) ?? 0,
         attributes: JSON.stringify(v.attributes ?? {}),
@@ -440,7 +444,9 @@ export class CJDropshippingService {
         },
       });
       if (images.length > 0) {
-        await this.prisma.productImage.deleteMany({ where: { productId: existing.id } });
+        await this.prisma.productImage.deleteMany({
+          where: { productId: existing.id },
+        });
         await this.prisma.productImage.createMany({
           data: images.map((url, i) => ({
             productId: existing.id,
@@ -490,9 +496,12 @@ export class CJDropshippingService {
         variants: variants.length
           ? {
               create: variants.map((v, i) => ({
-                name: v.attributes && Object.keys(v.attributes).length
-                  ? Object.entries(v.attributes).map(([k, val]) => `${k}: ${val}`).join(' / ')
-                  : `SKU ${i + 1}`,
+                name:
+                  v.attributes && Object.keys(v.attributes).length
+                    ? Object.entries(v.attributes)
+                        .map(([k, val]) => `${k}: ${val}`)
+                        .join(' / ')
+                    : `SKU ${i + 1}`,
                 sku: `CJ-${p.id}-V${v.id}`,
                 price: computeMinSellPrice(cents(v.price)) ?? 0,
                 attributes: JSON.stringify(v.attributes ?? {}),
@@ -508,7 +517,9 @@ export class CJDropshippingService {
   }
 
   async createImportJob(dto: CreateCJImportJobDto): Promise<CJDropshippingImportJobResult> {
-    const category = await this.prisma.category.findUnique({ where: { id: dto.categoryId } });
+    const category = await this.prisma.category.findUnique({
+      where: { id: dto.categoryId },
+    });
     if (!category) throw new BadRequestException('Category not found');
     if (!dto.source || dto.source.trim().length === 0) {
       throw new BadRequestException('A search source is required.');
@@ -530,14 +541,18 @@ export class CJDropshippingService {
   }
 
   async advanceJob(id: string): Promise<CJDropshippingImportJobResult> {
-    const job = await this.prisma.productImportJob.findUnique({ where: { id } });
+    const job = await this.prisma.productImportJob.findUnique({
+      where: { id },
+    });
     if (!job) throw new NotFoundException('Import job not found');
     if (job.status === 'COMPLETED' || job.status === 'CANCELLED') {
       throw new ConflictException(`Import job is already ${job.status.toLowerCase()} — no more pages to advance.`);
     }
     const adapter = await this.buildAdapter();
     const supplier = await this.suppliersService.ensureCJSupplier();
-    const category = await this.prisma.category.findUnique({ where: { id: job.categoryId } });
+    const category = await this.prisma.category.findUnique({
+      where: { id: job.categoryId },
+    });
     if (!category) throw new BadRequestException('Category not found');
 
     const failedIds = this.parseFailedIds(job.failedIds);
@@ -605,7 +620,9 @@ export class CJDropshippingService {
   }
 
   async cancelJob(id: string): Promise<CJDropshippingImportJobResult> {
-    const job = await this.prisma.productImportJob.findUnique({ where: { id } });
+    const job = await this.prisma.productImportJob.findUnique({
+      where: { id },
+    });
     if (!job) throw new NotFoundException('Import job not found');
     if (['COMPLETED', 'CANCELLED', 'FAILED'].includes(job.status)) {
       throw new ConflictException(`Import job is already ${job.status.toLowerCase()} and cannot be cancelled.`);
@@ -618,7 +635,9 @@ export class CJDropshippingService {
   }
 
   async getJob(id: string): Promise<CJDropshippingImportJobResult> {
-    const job = await this.prisma.productImportJob.findUnique({ where: { id } });
+    const job = await this.prisma.productImportJob.findUnique({
+      where: { id },
+    });
     if (!job) throw new NotFoundException('Import job not found');
     return this.jobToResult(job);
   }
@@ -637,7 +656,16 @@ export class CJDropshippingService {
 
   // -- inventory / price sync --------------------------------------------------
 
-  async syncInventory(maxProducts = 20): Promise<{ success: boolean; updated: number; skipped: number; message?: string }> {
+  async syncInventory(
+    maxProducts = 20,
+    checkedBefore?: Date,
+  ): Promise<{
+    success: boolean;
+    processed: number;
+    updated: number;
+    skipped: number;
+    message?: string;
+  }> {
     const adapter = await this.buildAdapter();
     const supplier = await this.suppliersService.ensureCJSupplier();
     // CJ imports store their supplier link directly on Product.  Older imports
@@ -658,12 +686,14 @@ export class CJDropshippingService {
     // Run the oldest product checks first. This keeps the scheduler below its
     // request timeout while ensuring every linked product is refreshed over
     // successive runs instead of repeatedly checking only the first page.
-    const lastSyncAt = (product: typeof candidates[number]) => Math.max(
-      0,
-      ...product.inventory.map((inventory) => inventory.lastSyncedAt?.getTime() ?? 0),
-      ...product.variants.map((variant) => variant.inventory?.lastSyncedAt?.getTime() ?? 0),
-    );
+    const lastSyncAt = (product: (typeof candidates)[number]) =>
+      Math.max(
+        0,
+        ...product.inventory.map((inventory) => inventory.lastSyncedAt?.getTime() ?? 0),
+        ...product.variants.map((variant) => variant.inventory?.lastSyncedAt?.getTime() ?? 0),
+      );
     const products = candidates
+      .filter((product) => !checkedBefore || lastSyncAt(product) < checkedBefore.getTime())
       .sort((left, right) => lastSyncAt(left) - lastSyncAt(right))
       .slice(0, maxProducts);
     let updated = 0;
@@ -678,10 +708,7 @@ export class CJDropshippingService {
           continue;
         }
         const inv = await adapter.getInventory(sourceProductId);
-        const totalQuantity = inv.variants.reduce(
-          (total, item) => total + Math.max(0, Number(item.quantity) || 0),
-          0,
-        );
+        const totalQuantity = inv.variants.reduce((total, item) => total + Math.max(0, Number(item.quantity) || 0), 0);
         // The admin list displays product-level inventory, so update it for
         // every product, including products that also have variants.
         const productInventory = await this.prisma.inventory.findFirst({
@@ -736,20 +763,46 @@ export class CJDropshippingService {
         if (product.supplierId !== supplier.id || product.supplierProductId !== sourceProductId) {
           await this.prisma.product.update({
             where: { id: product.id },
-            data: { supplierId: supplier.id, supplierProductId: sourceProductId },
+            data: {
+              supplierId: supplier.id,
+              supplierProductId: sourceProductId,
+            },
           });
         }
         updated++;
       } catch {
         // Keep the last verified quantity and expose this attempt as unknown.
+        const failedAt = new Date();
+        const productInventory = await this.prisma.inventory.findFirst({
+          where: { productId: product.id, variantId: null },
+          select: { id: true },
+        });
+        if (productInventory) {
+          await this.prisma.inventory.update({
+            where: { id: productInventory.id },
+            data: { syncStatus: 'FAILED', lastSyncedAt: failedAt },
+          });
+        } else {
+          await this.prisma.inventory.create({
+            data: {
+              productId: product.id,
+              variantId: null,
+              quantity: 0,
+              supplierStock: 0,
+              trackQuantity: true,
+              syncStatus: 'FAILED',
+              lastSyncedAt: failedAt,
+            },
+          });
+        }
         await this.prisma.inventory.updateMany({
-          where: { productId: product.id },
-          data: { syncStatus: 'FAILED', lastSyncedAt: new Date() },
+          where: { productId: product.id, variantId: { not: null } },
+          data: { syncStatus: 'FAILED', lastSyncedAt: failedAt },
         });
         skipped++;
       }
     }
-    return { success: true, updated, skipped };
+    return { success: true, processed: products.length, updated, skipped };
   }
 
   // -- shipping / logistics ----------------------------------------------------

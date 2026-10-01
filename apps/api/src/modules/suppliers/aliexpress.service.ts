@@ -4,11 +4,7 @@ import axios from 'axios';
 import * as crypto from 'crypto';
 import { PrismaService } from '../../database/prisma.service';
 import { SuppliersService } from './suppliers.service';
-import {
-  AliExpressAdapter,
-  AliExpressFeedProduct,
-  AliExpressFeedSummary,
-} from './adapters/aliexpress.adapter';
+import { AliExpressAdapter, AliExpressFeedProduct, AliExpressFeedSummary } from './adapters/aliexpress.adapter';
 import { SupplierApiError } from './adapters/supplier-api.error';
 import { ConfigureAliExpressDto } from './dto/configure-aliexpress.dto';
 import { ImportAliExpressCatalogDto } from './dto/import-aliexpress-catalog.dto';
@@ -150,18 +146,12 @@ export class AliExpressService {
   }
 
   private get authAuthorizeUrl(): string {
-    return (
-      this.env('ALIEXPRESS_AUTH_AUTHORIZE_URL') ??
-      'https://auth.aliexpress.com/oauth/authorize'
-    );
+    return this.env('ALIEXPRESS_AUTH_AUTHORIZE_URL') ?? 'https://auth.aliexpress.com/oauth/authorize';
   }
 
   /** AliExpress Open Platform gateway for signed API calls including OAuth token exchange. */
   private get aliExpressGatewayUrl(): string {
-    return (
-      this.env('ALIEXPRESS_API_BASE_URL') ??
-      'https://api-sg.aliexpress.com/rest'
-    );
+    return this.env('ALIEXPRESS_API_BASE_URL') ?? 'https://api-sg.aliexpress.com/rest';
   }
 
   private get adminRedirectBase(): string {
@@ -257,11 +247,7 @@ export class AliExpressService {
 
   // -- capability model -------------------------------------------------------
 
-  private buildCapabilities(opts: {
-    configured: boolean;
-    hasToken: boolean;
-    verified: boolean;
-  }): SupplierCapability[] {
+  private buildCapabilities(opts: { configured: boolean; hasToken: boolean; verified: boolean }): SupplierCapability[] {
     const ops: Array<[string, string]> = [
       ['PRODUCT_SEARCH', 'Product search'],
       ['PRODUCT_DETAIL', 'Product detail'],
@@ -287,7 +273,12 @@ export class AliExpressService {
       note = 'Implemented but not yet confirmed against the live API.';
     }
 
-    return ops.map(([operation, label]) => ({ operation, label, status, note }));
+    return ops.map(([operation, label]) => ({
+      operation,
+      label,
+      status,
+      note,
+    }));
   }
 
   // -- public operations ------------------------------------------------------
@@ -304,9 +295,7 @@ export class AliExpressService {
     if (dto.appKey !== undefined) {
       const v = dto.appKey.trim();
       if (v.length < 4 || this.isPlaceholder(v)) {
-        throw new BadRequestException(
-          'AliExpress App Key looks invalid — placeholders are not accepted.',
-        );
+        throw new BadRequestException('AliExpress App Key looks invalid — placeholders are not accepted.');
       }
       updates.appKey = v;
     }
@@ -314,9 +303,7 @@ export class AliExpressService {
     if (dto.appSecret !== undefined) {
       const v = dto.appSecret.trim();
       if (v.length < 20 || this.isPlaceholder(v)) {
-        throw new BadRequestException(
-          'AliExpress App Secret looks invalid — placeholders are not accepted.',
-        );
+        throw new BadRequestException('AliExpress App Secret looks invalid — placeholders are not accepted.');
       }
       updates.appSecret = v;
     }
@@ -324,9 +311,7 @@ export class AliExpressService {
     if (dto.callbackUrl !== undefined) {
       const v = dto.callbackUrl.trim();
       if (!this.isValidCallbackUrl(v)) {
-        throw new BadRequestException(
-          `Callback URL must be a stable HTTPS URL ending in ${ALIEXPRESS_CALLBACK_PATH} (no http, no localhost).`,
-        );
+        throw new BadRequestException(`Callback URL must be a stable HTTPS URL ending in ${ALIEXPRESS_CALLBACK_PATH} (no http, no localhost).`);
       }
       updates.callbackUrl = v;
     }
@@ -419,10 +404,7 @@ export class AliExpressService {
       return `${base}${ADMIN_SUPPLIERS_PATH}?aliexpress=connected`;
     } catch (err) {
       // Safe message only — never the code, secret or token.
-      const message =
-        err instanceof SupplierApiError
-          ? err.message
-          : 'AliExpress authorization failed';
+      const message = err instanceof SupplierApiError ? err.message : 'AliExpress authorization failed';
       return `${base}${ADMIN_SUPPLIERS_PATH}?aliexpress=error&reason=${encodeURIComponent(message)}`;
     }
   }
@@ -458,19 +440,13 @@ export class AliExpressService {
 
     let response;
     try {
-      response = await axios.post(
-        `${this.aliExpressGatewayUrl.replace(/\/$/, '')}${tokenPath}`,
-        new URLSearchParams({ ...unsignedParams, sign }).toString(),
-        {
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8' },
+      response = await axios.post(`${this.aliExpressGatewayUrl.replace(/\/$/, '')}${tokenPath}`, new URLSearchParams({ ...unsignedParams, sign }).toString(), {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8',
         },
-      );
+      });
     } catch (error: any) {
-      throw new SupplierApiError(
-        SupplierApiErrorCodeFor(error),
-        'AliExpress token exchange failed',
-        error.response?.status ?? 0,
-      );
+      throw new SupplierApiError(SupplierApiErrorCodeFor(error), 'AliExpress token exchange failed', error.response?.status ?? 0);
     }
 
     const data = response.data ?? {};
@@ -481,9 +457,7 @@ export class AliExpressService {
     const errMessage = data?.message ?? data?.error_response?.msg;
     if (errCode !== undefined && String(errCode) !== '0' && String(errCode) !== '200') {
       throw new SupplierApiError(
-        errCode === 'InvalidCode' ||
-          errCode === 'invalid_grant' ||
-          errCode === 'InvalidSession'
+        errCode === 'InvalidCode' || errCode === 'invalid_grant' || errCode === 'InvalidSession'
           ? SupplierApiErrorCode.NOT_AUTHORIZED
           : SupplierApiErrorCode.API_ERROR,
         errMessage || 'AliExpress token exchange failed',
@@ -496,10 +470,7 @@ export class AliExpressService {
 
     const accessToken = payload?.access_token ?? data?.access_token;
     if (!accessToken) {
-      throw new SupplierApiError(
-        SupplierApiErrorCode.NOT_AUTHORIZED,
-        'AliExpress returned no access token',
-      );
+      throw new SupplierApiError(SupplierApiErrorCode.NOT_AUTHORIZED, 'AliExpress returned no access token');
     }
     const expiresIn = Number(payload?.expires_in ?? payload?.refresh_expires_in ?? 0);
     return {
@@ -519,14 +490,17 @@ export class AliExpressService {
     const config = await this.storedConfig();
     const hasToken = Boolean(config.accessToken);
     const verified = Boolean(config.verified);
-    const capabilities = this.buildCapabilities({ configured, hasToken, verified });
+    const capabilities = this.buildCapabilities({
+      configured,
+      hasToken,
+      verified,
+    });
 
     let state: AliExpressConnectionStatus['state'];
     let message: string;
     if (!configured) {
       state = 'NOT_CONFIGURED';
-      message =
-        'AliExpress credentials / HTTPS callback URL are not configured. Configure App Key, App Secret and a stable HTTPS callback URL.';
+      message = 'AliExpress credentials / HTTPS callback URL are not configured. Configure App Key, App Secret and a stable HTTPS callback URL.';
     } else if (!hasToken) {
       state = 'DISCONNECTED';
       message = 'Configured but not authorized. Authorize with AliExpress to grant the seller access token.';
@@ -573,7 +547,10 @@ export class AliExpressService {
     });
 
     try {
-      const result = await adapter.authenticate({ code: 'ALIEXPRESS', apiConfig: config });
+      const result = await adapter.authenticate({
+        code: 'ALIEXPRESS',
+        apiConfig: config,
+      });
       if (!result.success) {
         // Safe message only — never the secret/token/params.
         return { success: false, message: result.message };
@@ -582,12 +559,14 @@ export class AliExpressService {
         verified: true,
         lastVerifiedAt: new Date().toISOString(),
       });
-      return { success: true, message: 'Connection verified against the AliExpress API.' };
+      return {
+        success: true,
+        message: 'Connection verified against the AliExpress API.',
+      };
     } catch (err) {
       return {
         success: false,
-        message:
-          err instanceof SupplierApiError ? err.message : 'AliExpress verification failed',
+        message: err instanceof SupplierApiError ? err.message : 'AliExpress verification failed',
       };
     }
   }
@@ -626,8 +605,12 @@ export class AliExpressService {
    * changes the local inventory records; it never creates supplier orders or
    * changes a product that is not explicitly linked to AliExpress.
    */
-  async syncInventory(maxProducts = 20): Promise<{
+  async syncInventory(
+    maxProducts = 20,
+    checkedBefore?: Date,
+  ): Promise<{
     success: boolean;
+    processed: number;
     updated: number;
     skipped: number;
     failedFetches: number;
@@ -646,12 +629,14 @@ export class AliExpressService {
       },
       include: { variants: { include: { inventory: true } }, inventory: true },
     });
-    const lastSyncAt = (product: typeof candidates[number]) => Math.max(
-      0,
-      ...product.inventory.map((inventory) => inventory.lastSyncedAt?.getTime() ?? 0),
-      ...product.variants.map((variant) => variant.inventory?.lastSyncedAt?.getTime() ?? 0),
-    );
+    const lastSyncAt = (product: (typeof candidates)[number]) =>
+      Math.max(
+        0,
+        ...product.inventory.map((inventory) => inventory.lastSyncedAt?.getTime() ?? 0),
+        ...product.variants.map((variant) => variant.inventory?.lastSyncedAt?.getTime() ?? 0),
+      );
     const products = candidates
+      .filter((product) => !checkedBefore || lastSyncAt(product) < checkedBefore.getTime())
       .sort((left, right) => lastSyncAt(left) - lastSyncAt(right))
       .slice(0, maxProducts);
 
@@ -664,22 +649,13 @@ export class AliExpressService {
       try {
         const sourceProductId = product.supplierProductId!;
         const metadata = this.parseMetadata(product.metadata);
-        const shipToCountry =
-          typeof metadata.country === 'string' && /^[A-Z]{2}$/i.test(metadata.country)
-            ? metadata.country.toUpperCase()
-            : 'IN';
-        const inventory = await adapter.getDropshippingInventory(
-          sourceProductId,
-          shipToCountry,
-        );
+        const shipToCountry = typeof metadata.country === 'string' && /^[A-Z]{2}$/i.test(metadata.country) ? metadata.country.toUpperCase() : 'IN';
+        const inventory = await adapter.getDropshippingInventory(sourceProductId, shipToCountry);
 
         // Keep one product-level inventory record even when variants exist.
         // This is the record shown in the admin inventory table; without it,
         // a successfully synced variant can still look "Not tracked" there.
-        const totalQuantity = inventory.variants.reduce(
-          (total, item) => total + Math.max(0, Number(item.quantity) || 0),
-          0,
-        );
+        const totalQuantity = inventory.variants.reduce((total, item) => total + Math.max(0, Number(item.quantity) || 0), 0);
         const productInventory = await this.prisma.inventory.findFirst({
           where: { productId: product.id, variantId: null },
           select: { id: true },
@@ -712,9 +688,7 @@ export class AliExpressService {
           // guess for manually edited SKUs: leave an unmatched variant alone.
           if (!variant.sku.startsWith(skuPrefix)) continue;
           const supplierVariantId = variant.sku.slice(skuPrefix.length);
-          const match = inventory.variants.find(
-            (item) => item.variantId === supplierVariantId,
-          );
+          const match = inventory.variants.find((item) => item.variantId === supplierVariantId);
           if (!match) continue;
 
           const quantity = Math.max(0, Number(match.quantity) || 0);
@@ -749,9 +723,32 @@ export class AliExpressService {
         // One unavailable supplier product must never stop the remaining sync.
         // Preserve its last quantity but mark it unverified instead of
         // presenting an unrecognized supplier response as confirmed zero.
+        const failedAt = new Date();
+        const productInventory = await this.prisma.inventory.findFirst({
+          where: { productId: product.id, variantId: null },
+          select: { id: true },
+        });
+        if (productInventory) {
+          await this.prisma.inventory.update({
+            where: { id: productInventory.id },
+            data: { syncStatus: 'FAILED', lastSyncedAt: failedAt },
+          });
+        } else {
+          await this.prisma.inventory.create({
+            data: {
+              productId: product.id,
+              variantId: null,
+              quantity: 0,
+              supplierStock: 0,
+              trackQuantity: true,
+              syncStatus: 'FAILED',
+              lastSyncedAt: failedAt,
+            },
+          });
+        }
         await this.prisma.inventory.updateMany({
-          where: { productId: product.id },
-          data: { syncStatus: 'FAILED', lastSyncedAt: new Date() },
+          where: { productId: product.id, variantId: { not: null } },
+          data: { syncStatus: 'FAILED', lastSyncedAt: failedAt },
         });
         skipped++;
         failedFetches++;
@@ -762,7 +759,14 @@ export class AliExpressService {
       where: { id: supplier.id },
       data: { syncEnabled: true, lastSyncedAt: new Date() },
     });
-    return { success: true, updated, skipped, failedFetches, unmatchedVariants };
+    return {
+      success: true,
+      processed: products.length,
+      updated,
+      skipped,
+      failedFetches,
+      unmatchedVariants,
+    };
   }
 
   /** List feed picker data. Safe on failure — honest, never fabricated. */
@@ -774,10 +778,7 @@ export class AliExpressService {
       return {
         configured: false,
         feeds: [],
-        error:
-          err instanceof BadRequestException
-            ? err.message
-            : 'AliExpress is not configured / not authorized.',
+        error: err instanceof BadRequestException ? err.message : 'AliExpress is not configured / not authorized.',
       };
     }
 
@@ -794,13 +795,7 @@ export class AliExpressService {
   }
 
   /** One live feed page with safe fields only — what the admin is about to import. */
-  async previewFeed(q: {
-    feedName: string;
-    country: string;
-    page?: number;
-    pageSize?: number;
-    currency?: string;
-  }): Promise<AliExpressFeedPreviewResult> {
+  async previewFeed(q: { feedName: string; country: string; page?: number; pageSize?: number; currency?: string }): Promise<AliExpressFeedPreviewResult> {
     const page = q.page ?? 1;
     const pageSize = Math.min(q.pageSize ?? 25, 50);
     try {
@@ -812,7 +807,13 @@ export class AliExpressService {
         pageSize,
         targetCurrency: q.currency,
       });
-      return { products: res.products, totalRecordCount: res.totalRecordCount, page, pageSize, currency: q.currency };
+      return {
+        products: res.products,
+        totalRecordCount: res.totalRecordCount,
+        page,
+        pageSize,
+        currency: q.currency,
+      };
     } catch (err) {
       return {
         products: [],
@@ -820,12 +821,7 @@ export class AliExpressService {
         page,
         pageSize,
         currency: q.currency,
-        error:
-          err instanceof SupplierApiError
-            ? err.message
-            : err instanceof BadRequestException
-            ? err.message
-            : 'AliExpress feed preview failed.',
+        error: err instanceof SupplierApiError ? err.message : err instanceof BadRequestException ? err.message : 'AliExpress feed preview failed.',
       };
     }
   }
@@ -857,9 +853,7 @@ export class AliExpressService {
   /** True when the error is a fatal NOT_AUTHORIZED (expired/revoked token) that
    * must not be retried — the admin must re-authorize. */
   private isAuthError(err: unknown): boolean {
-    return (
-      err instanceof SupplierApiError && err.code === SupplierApiErrorCode.NOT_AUTHORIZED
-    );
+    return err instanceof SupplierApiError && err.code === SupplierApiErrorCode.NOT_AUTHORIZED;
   }
 
   /** True when the error indicates a unique-constraint violation (P2002). */
@@ -951,15 +945,15 @@ export class AliExpressService {
         data: {
           basePrice: cents(fp.priceAmount) || existing.basePrice,
           currency: displayCurrency,
-          compareAtPrice: fp.originalPriceAmount
-            ? cents(fp.originalPriceAmount)
-            : existing.compareAtPrice,
+          compareAtPrice: fp.originalPriceAmount ? cents(fp.originalPriceAmount) : existing.compareAtPrice,
           supplierProductId: fp.productId,
           metadata,
         },
       });
       if (imageUrls.length > 0) {
-        await this.prisma.productImage.deleteMany({ where: { productId: existing.id } });
+        await this.prisma.productImage.deleteMany({
+          where: { productId: existing.id },
+        });
         await this.prisma.productImage.createMany({
           data: imageUrls.map((url, i) => ({
             productId: existing.id,
@@ -989,9 +983,7 @@ export class AliExpressService {
 
     const finalPrice = fp.priceAmount ?? detail?.price?.amount ?? 0;
     const finalOriginal = fp.originalPriceAmount ?? detail?.originalPrice?.amount ?? 0;
-    const finalCurrency = safeCurrency(
-      fp.priceCurrency || detail?.price?.currency,
-    );
+    const finalCurrency = safeCurrency(fp.priceCurrency || detail?.price?.currency);
     // Feed price is the LANE COST. The sell price starts at the 30% margin
     // floor (rounds UP) so an admin-ACTIVATED product never needs touching.
     const costPaise = cents(finalPrice);
@@ -1002,10 +994,7 @@ export class AliExpressService {
         name: fp.title,
         slug,
         sku,
-        description:
-          detail?.description ||
-          fp.description ||
-          `Imported from AliExpress feed "${job.feedName}" (${fp.productId}).`,
+        description: detail?.description || fp.description || `Imported from AliExpress feed "${job.feedName}" (${fp.productId}).`,
         basePrice: sellPaise,
         cost: costPaise || null,
         compareAtPrice: finalOriginal ? cents(finalOriginal) : null,
@@ -1033,10 +1022,7 @@ export class AliExpressService {
                   name: `SKU ${i + 1}`,
                   sku: `AE-${fp.productId}-V${s.sku_id}`,
                   price: computeMinSellPrice(variantCost) ?? 0,
-                  compareAtPrice:
-                    s.sku_original_price?.amount != null
-                      ? cents(s.sku_original_price.amount)
-                      : null,
+                  compareAtPrice: s.sku_original_price?.amount != null ? cents(s.sku_original_price.amount) : null,
                   attributes: '{}',
                   sortOrder: i,
                   isActive: true,
@@ -1057,7 +1043,9 @@ export class AliExpressService {
    * page.
    */
   async createImportJob(dto: CreateImportJobDto): Promise<ProductImportJobResult> {
-    const category = await this.prisma.category.findUnique({ where: { id: dto.categoryId } });
+    const category = await this.prisma.category.findUnique({
+      where: { id: dto.categoryId },
+    });
     if (!category) {
       throw new BadRequestException('Category not found');
     }
@@ -1091,20 +1079,25 @@ export class AliExpressService {
    * request).
    */
   async advanceJob(id: string): Promise<ProductImportJobResult> {
-    const job = await this.prisma.productImportJob.findUnique({ where: { id } });
+    const job = await this.prisma.productImportJob.findUnique({
+      where: { id },
+    });
     if (!job) throw new NotFoundException('Import job not found');
     if (job.status === 'COMPLETED' || job.status === 'CANCELLED') {
-      throw new ConflictException(
-        `Import job is already ${job.status.toLowerCase()} — no more pages to advance.`,
-      );
+      throw new ConflictException(`Import job is already ${job.status.toLowerCase()} — no more pages to advance.`);
     }
 
     const adapter = await this.buildAdapter(); // 400 when not configured/no token
     const supplier = await this.suppliersService.ensureAliExpressSupplier();
-    const category = await this.prisma.category.findUnique({ where: { id: job.categoryId } });
+    const category = await this.prisma.category.findUnique({
+      where: { id: job.categoryId },
+    });
     if (!category) throw new BadRequestException('Category not found');
 
-    const enrichCounts = { enrichedVariants: job.enrichedVariantCount, enrichFailed: job.enrichFailedCount };
+    const enrichCounts = {
+      enrichedVariants: job.enrichedVariantCount,
+      enrichFailed: job.enrichFailedCount,
+    };
     const failedIds = this.parseFailedIds(job.failedIds);
     const delta = { imported: 0, updated: 0, skipped: 0, failed: 0 };
 
@@ -1184,7 +1177,9 @@ export class AliExpressService {
 
   /** Cancel a running/pending job. Already-terminal jobs → 409. */
   async cancelJob(id: string): Promise<ProductImportJobResult> {
-    const job = await this.prisma.productImportJob.findUnique({ where: { id } });
+    const job = await this.prisma.productImportJob.findUnique({
+      where: { id },
+    });
     if (!job) throw new NotFoundException('Import job not found');
     if (['COMPLETED', 'CANCELLED', 'FAILED'].includes(job.status)) {
       throw new ConflictException(`Import job is already ${job.status.toLowerCase()} and cannot be cancelled.`);
@@ -1203,17 +1198,24 @@ export class AliExpressService {
    * them in the list for another retry.
    */
   async retryFailed(id: string): Promise<ProductImportJobResult> {
-    const job = await this.prisma.productImportJob.findUnique({ where: { id } });
+    const job = await this.prisma.productImportJob.findUnique({
+      where: { id },
+    });
     if (!job) throw new NotFoundException('Import job not found');
     const adapter = await this.buildAdapter();
     const supplier = await this.suppliersService.ensureAliExpressSupplier();
-    const category = await this.prisma.category.findUnique({ where: { id: job.categoryId } });
+    const category = await this.prisma.category.findUnique({
+      where: { id: job.categoryId },
+    });
     if (!category) throw new BadRequestException('Category not found');
 
     const failedIds = this.parseFailedIds(job.failedIds);
     if (failedIds.length === 0) return this.jobToResult(job);
 
-    const enrichCounts = { enrichedVariants: job.enrichedVariantCount, enrichFailed: job.enrichFailedCount };
+    const enrichCounts = {
+      enrichedVariants: job.enrichedVariantCount,
+      enrichFailed: job.enrichFailedCount,
+    };
     const stillFailed: string[] = [];
     let deltaImported = 0;
     let deltaUpdated = 0;
@@ -1263,18 +1265,16 @@ export class AliExpressService {
 
   /** Fetch a single job's state (safe fields only). */
   async getJob(id: string): Promise<ProductImportJobResult> {
-    const job = await this.prisma.productImportJob.findUnique({ where: { id } });
+    const job = await this.prisma.productImportJob.findUnique({
+      where: { id },
+    });
     if (!job) throw new NotFoundException('Import job not found');
     return this.jobToResult(job);
   }
 
   /** Most recent job for a given feed+category (for the UI to pick up where
    *  it left off). Returns null when no job exists yet. */
-  async getLatestJob(query: {
-    feedName: string;
-    country: string;
-    categoryId: string;
-  }): Promise<ProductImportJobResult | null> {
+  async getLatestJob(query: { feedName: string; country: string; categoryId: string }): Promise<ProductImportJobResult | null> {
     const job = await this.prisma.productImportJob.findFirst({
       where: {
         feedName: query.feedName,
@@ -1338,7 +1338,5 @@ export class AliExpressService {
 }
 
 function SupplierApiErrorCodeFor(error: { status?: number }): SupplierApiErrorCode {
-  return error.status === 401 || error.status === 403
-    ? SupplierApiErrorCode.NOT_AUTHORIZED
-    : SupplierApiErrorCode.API_ERROR;
+  return error.status === 401 || error.status === 403 ? SupplierApiErrorCode.NOT_AUTHORIZED : SupplierApiErrorCode.API_ERROR;
 }
