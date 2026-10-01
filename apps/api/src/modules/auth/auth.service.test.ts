@@ -390,6 +390,73 @@ describe('AuthService — timing enumeration (B1/B2) & single-use tokens (C5)', 
         new UnauthorizedException('Account is deactivated'),
       );
     });
+
+    it('keeps only admin sessions signed in for 180 days', async () => {
+      const { service, prisma, jwtService } = build();
+      const response = { cookie: jest.fn() };
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'admin-1',
+        email: 'admin@aurevo.buzz',
+        passwordHash: '$2b$12$userhashuserhashuserh',
+        isActive: true,
+        role: UserRole.ADMIN,
+      });
+      (bcrypt.compare as jest.Mock).mockResolvedValueOnce(true);
+
+      await service.login(
+        { email: 'admin@aurevo.buzz', password: 'Password123!' },
+        response,
+      );
+
+      expect(jwtService.sign).toHaveBeenCalledWith(
+        expect.objectContaining({ role: UserRole.ADMIN }),
+        expect.objectContaining({ expiresIn: '180d' }),
+      );
+      expect(response.cookie).toHaveBeenCalledWith(
+        'refresh_token',
+        'signed.token',
+        expect.objectContaining({
+          httpOnly: true,
+          maxAge: 180 * 24 * 60 * 60 * 1000,
+          path: '/api/auth',
+        }),
+      );
+    });
+
+    it('uses a cross-site partitioned cookie for the deployed frontend and API', async () => {
+      const previousNodeEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'production';
+
+      try {
+        const { service, prisma } = build();
+        const response = { cookie: jest.fn() };
+        prisma.user.findUnique.mockResolvedValue({
+          id: 'admin-1',
+          email: 'admin@aurevo.buzz',
+          passwordHash: '$2b$12$userhashuserhashuserh',
+          isActive: true,
+          role: UserRole.ADMIN,
+        });
+        (bcrypt.compare as jest.Mock).mockResolvedValueOnce(true);
+
+        await service.login(
+          { email: 'admin@aurevo.buzz', password: 'Password123!' },
+          response,
+        );
+
+        expect(response.cookie).toHaveBeenCalledWith(
+          'refresh_token',
+          'signed.token',
+          expect.objectContaining({
+            secure: true,
+            sameSite: 'none',
+            partitioned: true,
+          }),
+        );
+      } finally {
+        process.env.NODE_ENV = previousNodeEnv;
+      }
+    });
   });
 
   describe('forgot-password / resend — identical body for ghosts, no token leaked (B1/C5)', () => {

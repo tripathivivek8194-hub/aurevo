@@ -124,7 +124,7 @@ export class AuthService {
     const tokens = await this.generateTokens(user);
 
     // Set refresh token cookie
-    this.setRefreshTokenCookie(response, tokens.refreshToken);
+    this.setRefreshTokenCookie(response, tokens.refreshToken, user.role);
 
     // Update last login
     await (this.prisma as any).user.update({
@@ -258,7 +258,7 @@ export class AuthService {
     // Use the exact same AUREVO session/token system as normal login.
     const tokens = await this.generateTokens(user);
 
-    this.setRefreshTokenCookie(response, tokens.refreshToken);
+    this.setRefreshTokenCookie(response, tokens.refreshToken, user.role);
 
     await (this.prisma as any).user.update({
       where: { id: user.id },
@@ -335,7 +335,7 @@ export class AuthService {
     const tokens = await this.generateTokens(user);
 
     // Set new refresh token cookie
-    this.setRefreshTokenCookie(response, tokens.refreshToken);
+    this.setRefreshTokenCookie(response, tokens.refreshToken, user.role);
 
     return {
       user: this.sanitizeUser(user),
@@ -491,6 +491,10 @@ export class AuthService {
 
   private async generateTokens(user: any) {
     const payload = { sub: user.id, email: user.email, role: user.role };
+    const isAdmin = user.role === UserRole.ADMIN;
+    const refreshExpiry = isAdmin
+      ? this.configService.get<string>('JWT_ADMIN_REFRESH_EXPIRY') || '180d'
+      : this.configService.get<string>('JWT_REFRESH_EXPIRY') || '30d';
 
     const accessToken = this.jwtService.sign(payload);
 
@@ -501,9 +505,10 @@ export class AuthService {
     const refreshToken = this.jwtService.sign(payload, {
       secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
       jwtid: jti,
-      // M2: refresh tokens are long-lived (30d) — never inherit the 15m access
-      // default from the JwtModule options.
-      expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRY') || '30d',
+      // Admin sessions are deliberately longer-lived so the store owner stays
+      // signed in across refreshes and browser restarts. Customer sessions keep
+      // the regular 30-day lifetime. Neither inherits the 15m access default.
+      expiresIn: refreshExpiry,
     });
 
     // M2: store only a SHA-256 digest of the refresh token, never the token
@@ -533,26 +538,38 @@ export class AuthService {
   }
 
   /**
-   * M2: the refresh cookie is HttpOnly, SameSite=Strict and scoped to the auth
-   * routes (`/api/auth`) so it is never sent on unrelated navigation, and
-   * `Secure` in production (over TLS). maxAge is set on write only — a
-   * clearCookie must NOT carry maxAge, or Express would re-arm a 30-day cookie.
+   * The deployed storefront (aurevo.buzz) and API (onrender.com) are different
+   * sites. Production therefore needs a Secure, SameSite=None cookie; marking it
+   * Partitioned keeps it usable in modern browsers that restrict third-party
+   * cookies while isolating it to the AUREVO top-level site. Development stays
+   * SameSite=Strict. The cookie is HttpOnly and auth-route scoped in both cases.
+   * Admin sessions last 180 days; customer sessions retain the regular 30 days.
+   * maxAge is write-only — clearCookie must not carry it.
    */
-  private setRefreshTokenCookie(response: any, token: string) {
+  private setRefreshTokenCookie(response: any, token: string, role: string) {
+    const isProduction = process.env.NODE_ENV === 'production';
+    const isAdmin = role === UserRole.ADMIN;
+    const sameSite: 'none' | 'strict' = isProduction ? 'none' : 'strict';
+
     response.cookie('refresh_token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict' as const,
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      secure: isProduction,
+      sameSite,
+      ...(isProduction ? { partitioned: true } : {}),
+      maxAge: (isAdmin ? 180 : 30) * 24 * 60 * 60 * 1000,
       path: '/api/auth',
     });
   }
 
   private clearRefreshTokenCookie(response: any) {
+    const isProduction = process.env.NODE_ENV === 'production';
+    const sameSite: 'none' | 'strict' = isProduction ? 'none' : 'strict';
+
     response.clearCookie('refresh_token', {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict' as const,
+      secure: isProduction,
+      sameSite,
+      ...(isProduction ? { partitioned: true } : {}),
       path: '/api/auth',
     });
   }
