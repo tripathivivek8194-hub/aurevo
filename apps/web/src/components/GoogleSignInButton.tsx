@@ -24,10 +24,12 @@ const GOOGLE_SCRIPT_SRC = 'https://accounts.google.com/gsi/client';
 
 interface GoogleSignInButtonProps {
   onCredential: (credential: string) => void;
+  label?: 'continue_with' | 'signup_with';
 }
 
 export function GoogleSignInButton({
   onCredential,
+  label = 'continue_with',
 }: GoogleSignInButtonProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const callbackRef = useRef(onCredential);
@@ -71,9 +73,9 @@ export function GoogleSignInButton({
           type: 'standard',
           theme: 'outline',
           size: 'large',
-          text: 'continue_with',
-          shape: 'rectangular',
-          width: 320,
+          text: label,
+          shape: 'pill',
+          width: 384,
         },
       );
     };

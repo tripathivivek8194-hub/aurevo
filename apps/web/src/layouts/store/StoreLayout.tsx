@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@aurevo/design-system';
 import { ThemeToggle } from '../../components/ThemeToggle';
@@ -24,7 +24,9 @@ export function StoreLayout() {
 
   const [search, setSearch] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [categories, setCategories] = useState<CategorySummary[]>([]);
+  const accountMenuRef = useRef<HTMLDivElement>(null);
 
   // Load cart count whenever auth status changes.
   useEffect(() => {
@@ -75,7 +77,21 @@ export function StoreLayout() {
   // Close mobile navigation whenever the route changes.
   useEffect(() => {
     setMobileMenuOpen(false);
+    setAccountMenuOpen(false);
   }, [location.pathname, location.search]);
+
+  useEffect(() => {
+    if (!accountMenuOpen) return;
+
+    const closeWhenClickedOutside = (event: MouseEvent) => {
+      if (!accountMenuRef.current?.contains(event.target as Node)) {
+        setAccountMenuOpen(false);
+      }
+    };
+
+    window.addEventListener('mousedown', closeWhenClickedOutside);
+    return () => window.removeEventListener('mousedown', closeWhenClickedOutside);
+  }, [accountMenuOpen]);
 
   const authenticated = status === 'authenticated' && !!user;
 
@@ -259,43 +275,67 @@ export function StoreLayout() {
               {/* Desktop account actions */}
               <div className="hidden items-center gap-2 lg:flex">
                 {authenticated ? (
-                  <>
-                    {isAdmin(user?.role) && (
-                      <NavLink
-                        to="/admin"
-                        className={({ isActive }) =>
-                          `rounded-full px-3 py-2 text-sm font-medium transition-colors ${
-                            isActive
-                              ? 'bg-[var(--color-background-hover)] text-[var(--color-interactive-primary)]'
-                              : 'text-[var(--color-interactive-primary)] hover:bg-[var(--color-background-hover)]'
-                          }`
-                        }
+                  <div ref={accountMenuRef} className="relative">
+                    <button
+                      type="button"
+                      aria-label="Open account menu"
+                      aria-expanded={accountMenuOpen}
+                      aria-haspopup="menu"
+                      onClick={() => setAccountMenuOpen((open) => !open)}
+                      className="flex items-center gap-2 rounded-full border border-[var(--color-border)] bg-[var(--color-background-secondary)] py-1.5 pl-2 pr-3 text-sm font-medium text-[var(--color-text-primary)] shadow-sm transition-all hover:border-[var(--color-border-focus)] hover:bg-[var(--color-background-hover)]"
+                    >
+                      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--color-interactive-primary)] text-xs font-bold text-white">
+                        {user.firstName.slice(0, 1).toUpperCase()}
+                      </span>
+                      <span className="max-w-24 truncate">{user.firstName}</span>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-4 w-4 text-[var(--color-text-tertiary)]"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                        aria-hidden="true"
                       >
-                        Admin
-                      </NavLink>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="m6 9 6 6 6-6" />
+                      </svg>
+                    </button>
+
+                    {accountMenuOpen && (
+                      <div
+                        role="menu"
+                        className="absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-background-primary)] p-2 shadow-2xl"
+                      >
+                        <div className="border-b border-[var(--color-border)] px-3 py-2.5">
+                          <p className="truncate text-sm font-semibold text-[var(--color-text-primary)]">
+                            {user.firstName} {user.lastName}
+                          </p>
+                          <p className="mt-0.5 truncate text-xs text-[var(--color-text-tertiary)]">
+                            {user.email}
+                          </p>
+                        </div>
+                        <NavLink to="/account" role="menuitem" className="mt-1 flex rounded-xl px-3 py-2.5 text-sm text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-background-hover)] hover:text-[var(--color-text-primary)]">
+                          My account
+                        </NavLink>
+                        <NavLink to="/account/orders" role="menuitem" className="flex rounded-xl px-3 py-2.5 text-sm text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-background-hover)] hover:text-[var(--color-text-primary)]">
+                          My orders
+                        </NavLink>
+                        {isAdmin(user.role) && (
+                          <NavLink to="/admin" role="menuitem" className="flex rounded-xl px-3 py-2.5 text-sm font-medium text-[var(--color-interactive-primary)] transition-colors hover:bg-[var(--color-background-hover)]">
+                            Admin dashboard
+                          </NavLink>
+                        )}
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={() => void handleLogout()}
+                          className="mt-1 flex w-full rounded-xl px-3 py-2.5 text-left text-sm font-medium text-red-500 transition-colors hover:bg-red-500/10"
+                        >
+                          Log out
+                        </button>
+                      </div>
                     )}
-
-                    <NavLink
-                      to="/account"
-                      className={({ isActive }) =>
-                        `rounded-full px-3 py-2 text-sm transition-colors ${
-                          isActive
-                            ? 'bg-[var(--color-background-hover)] font-medium text-[var(--color-text-primary)]'
-                            : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-background-hover)] hover:text-[var(--color-text-primary)]'
-                        }`
-                      }
-                    >
-                      Account
-                    </NavLink>
-
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleLogout}
-                    >
-                      Log out
-                    </Button>
-                  </>
+                  </div>
                 ) : (
                   <>
                     <Button

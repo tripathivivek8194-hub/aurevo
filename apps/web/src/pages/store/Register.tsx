@@ -1,4 +1,4 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useCallback, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Alert,
@@ -11,6 +11,7 @@ import { api } from '../../lib/api';
 import { useSeo } from '../../hooks/useSeo';
 import { BrandLogo } from '../../components/BrandLogo';
 import { useAuthStore } from '../../stores/auth';
+import { GoogleSignInButton } from '../../components/GoogleSignInButton';
 
 /**
  * Customer registration.
@@ -20,6 +21,7 @@ import { useAuthStore } from '../../stores/auth';
 export function Register() {
   const navigate = useNavigate();
   const login = useAuthStore((s) => s.login);
+  const loginWithGoogle = useAuthStore((s) => s.loginWithGoogle);
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -28,6 +30,7 @@ export function Register() {
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [googleSubmitting, setGoogleSubmitting] = useState(false);
 
   useSeo({
     title: 'Create Account | AUREVO',
@@ -70,6 +73,25 @@ export function Register() {
       setSubmitting(false);
     }
   };
+
+  const handleGoogleCredential = useCallback(
+    async (idToken: string) => {
+      setError(null);
+      setGoogleSubmitting(true);
+
+      try {
+        await loginWithGoogle(idToken);
+        navigate('/', { replace: true });
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : 'Google sign-up failed',
+        );
+      } finally {
+        setGoogleSubmitting(false);
+      }
+    },
+    [loginWithGoogle, navigate],
+  );
 
   return (
     <div className="min-h-screen bg-[var(--color-background-primary)]">
@@ -318,7 +340,7 @@ export function Register() {
                   type="submit"
                   variant="primary"
                   className="h-12 w-full"
-                  disabled={submitting}
+                  disabled={submitting || googleSubmitting}
                 >
                   {submitting ? (
                     <Spinner size="sm" label="Creating account…" />
@@ -327,6 +349,21 @@ export function Register() {
                   )}
                 </Button>
               </form>
+
+              <div className="my-6 flex items-center gap-4">
+                <div className="h-px flex-1 bg-[var(--color-border)]" />
+                <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--color-text-tertiary)]">
+                  Or sign up with
+                </span>
+                <div className="h-px flex-1 bg-[var(--color-border)]" />
+              </div>
+
+              <div className={googleSubmitting ? 'pointer-events-none opacity-60' : ''}>
+                <GoogleSignInButton
+                  label="signup_with"
+                  onCredential={handleGoogleCredential}
+                />
+              </div>
             </div>
 
             <p className="mt-7 text-center text-sm text-[var(--color-text-secondary)]">
