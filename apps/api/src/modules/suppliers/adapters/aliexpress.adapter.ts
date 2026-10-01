@@ -579,7 +579,9 @@ export class AliExpressAdapter implements SupplierAdapter {
     const data = await this.request('POST', 'aliexpress.ds.product.get', params);
     const root = this.findMethodRoot(data);
     const result = root?.result ?? {};
-    const product = result?.product ?? {};
+    // The official DS response exposes the product directly in `result`.
+    // Some gateway versions wrap it in `result.product`, so accept both.
+    const product = result?.product ?? result;
     return this.transformDsProduct(product, shipToCountry);
   }
 
@@ -669,6 +671,13 @@ export class AliExpressAdapter implements SupplierAdapter {
       targetCurrency: 'INR',
       targetLanguage: 'EN',
     });
+
+    if (!product.skus?.length) {
+      throw new SupplierApiError(
+        SupplierApiErrorCode.API_ERROR,
+        'AliExpress returned no verifiable SKU inventory.',
+      );
+    }
 
     return {
       productId: supplierProductId,
@@ -837,14 +846,17 @@ export class AliExpressAdapter implements SupplierAdapter {
 
   /** Map `aliexpress.ds.product.get` detail to the shared SupplierProduct shape. */
   private transformDsProduct(product: any, shipToCountry: string): SupplierProduct {
-    const skuList = product?.ae_item_sku_info_dtos ?? [];
+    const skuContainer = product?.ae_item_sku_info_dtos ?? [];
+    const skuList = Array.isArray(skuContainer)
+      ? skuContainer
+      : skuContainer?.ae_item_sku_info_d_t_o ?? skuContainer?.ae_item_sku_info_dto ?? [];
     const skus = (Array.isArray(skuList) ? skuList : []).map((sku: any) => ({
-      sku_id: String(sku?.sku_id ?? ''),
+      sku_id: String(sku?.sku_id ?? sku?.id ?? ''),
       sku_price: sku?.sku_price,
       sku_original_price: sku?.sku_original_price,
-      sku_stock: Number(sku?.sku_available_stock ?? 0),
+      sku_stock: this.readDsSkuStock(sku),
       sku_code: sku?.sku_code,
-      sku_attrs: sku?.sku_attr,
+      sku_attrs: sku?.sku_attr ?? sku?.aeop_s_k_u_propertys,
     }));
     const images = Array.isArray(product?.product_image)
       ? product.product_image.filter((u: any) => typeof u === 'string' && u.length > 0)
@@ -874,6 +886,33 @@ export class AliExpressAdapter implements SupplierAdapter {
       rating: product?.rating,
       ordersCount: product?.trade_number,
     };
+  }
+
+  /** Read stock without turning a missing field into a confirmed zero. */
+  private readDsSkuStock(sku: any): number {
+    const candidates = [
+      sku?.sku_available_stock,
+      sku?.s_k_u_available_stock,
+      sku?.ipm_sku_stock,
+      sku?.ipmSkuStock,
+    ];
+    for (const value of candidates) {
+      if (value === null || value === undefined || value === '') continue;
+      const quantity = Number(value);
+      if (Number.isFinite(quantity) && quantity >= 0) return Math.floor(quantity);
+    }
+
+    // A boolean only proves availability; use one as a conservative floor.
+    if (sku?.sku_stock === true || sku?.sku_stock === 'true') return 1;
+    if (sku?.sku_stock === false || sku?.sku_stock === 'false') return 0;
+    if (typeof sku?.sku_stock === 'number' && Number.isFinite(sku.sku_stock)) {
+      return Math.max(0, Math.floor(sku.sku_stock));
+    }
+
+    throw new SupplierApiError(
+      SupplierApiErrorCode.API_ERROR,
+      'AliExpress returned an SKU without a recognized stock field.',
+    );
   }
 
   private transformProduct(product: any): SupplierProduct {

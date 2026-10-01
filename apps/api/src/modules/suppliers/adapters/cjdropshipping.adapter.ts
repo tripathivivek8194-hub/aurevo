@@ -404,6 +404,12 @@ export class CJDropshippingAdapter implements SupplierAdapter {
     // which includes an inventories[] array per variant.
     if (!variantIds?.length) {
       const product = await this.getProduct(supplierProductId);
+      if (!product.variants.length) {
+        throw new SupplierApiError(
+          SupplierApiErrorCode.API_ERROR,
+          'CJ returned no verifiable variant inventory.',
+        );
+      }
       return {
         productId: supplierProductId,
         variants: product.variants.map((v) => ({
@@ -416,14 +422,19 @@ export class CJDropshippingAdapter implements SupplierAdapter {
     }
     const variants: Array<{ variantId: string; quantity: number; available: boolean }> = [];
     for (const vid of variantIds) {
-      try {
-        const res = await this.authedGetRequest<any>(ENDPOINTS.queryStock, { vid });
-        const data = res?.data ?? {};
-        const qty = Number(data.totalInventory ?? data.stock ?? 0);
-        variants.push({ variantId: vid, quantity: qty, available: qty > 0 });
-      } catch {
-        variants.push({ variantId: vid, quantity: 0, available: false });
+      const res = await this.authedGetRequest<any>(ENDPOINTS.queryStock, { vid });
+      const warehouses = Array.isArray(res?.data) ? res.data : res?.data ? [res.data] : [];
+      if (!warehouses.length) {
+        throw new SupplierApiError(
+          SupplierApiErrorCode.API_ERROR,
+          `CJ returned no verifiable inventory for variant ${vid}.`,
+        );
       }
+      const qty = warehouses.reduce(
+        (total: number, warehouse: any) => total + this.readCjWarehouseQuantity(warehouse),
+        0,
+      );
+      variants.push({ variantId: vid, quantity: qty, available: qty > 0 });
     }
     return { productId: supplierProductId, variants };
   }
@@ -606,9 +617,26 @@ export class CJDropshippingAdapter implements SupplierAdapter {
   private sumInventory(inventories: unknown): number {
     if (!Array.isArray(inventories)) return 0;
     return inventories.reduce(
-      (sum: number, inv: any) => sum + Number(inv.totalInventory ?? inv.cjInventory ?? inv.stock ?? 0),
+      (sum: number, inv: any) => sum + this.readCjWarehouseQuantity(inv),
       0,
     );
+  }
+
+  private readCjWarehouseQuantity(inventory: any): number {
+    const value =
+      inventory?.totalInventoryNum ??
+      inventory?.totalInventory ??
+      inventory?.storageNum ??
+      inventory?.cjInventoryNum ??
+      inventory?.cjInventory;
+    const quantity = Number(value);
+    if (!Number.isFinite(quantity) || quantity < 0) {
+      throw new SupplierApiError(
+        SupplierApiErrorCode.API_ERROR,
+        'CJ returned an inventory record without a recognized quantity.',
+      );
+    }
+    return Math.floor(quantity);
   }
 
   /**

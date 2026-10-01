@@ -741,6 +741,11 @@ export class CJDropshippingService {
         }
         updated++;
       } catch {
+        // Keep the last verified quantity and expose this attempt as unknown.
+        await this.prisma.inventory.updateMany({
+          where: { productId: product.id },
+          data: { syncStatus: 'FAILED', lastSyncedAt: new Date() },
+        });
         skipped++;
       }
     }

@@ -31,10 +31,12 @@ export class InventoryService {
       // stock is defined here as 1..10 units.
       where.trackQuantity = true;
       where.quantity = { gte: 1, lte: 10 };
+      where.syncStatus = { not: 'FAILED' };
     }
     if (outOfStock) {
       where.trackQuantity = true;
       where.quantity = { lte: 0 };
+      where.syncStatus = { not: 'FAILED' };
     }
 
     const [inventory, total] = await Promise.all([
@@ -54,9 +56,9 @@ export class InventoryService {
     // Calculate available quantity for each
     const data = inventory.map(item => ({
       ...item,
-      available: item.trackQuantity ? Math.max(0, item.quantity - item.reservedQuantity) : null,
-      isLowStock: item.trackQuantity && item.quantity > 0 && item.quantity <= item.lowStockThreshold,
-      isOutOfStock: item.trackQuantity && item.quantity <= 0,
+      available: item.trackQuantity && item.syncStatus !== 'FAILED' ? Math.max(0, item.quantity - item.reservedQuantity) : null,
+      isLowStock: item.trackQuantity && item.syncStatus !== 'FAILED' && item.quantity > 0 && item.quantity <= item.lowStockThreshold,
+      isOutOfStock: item.trackQuantity && item.syncStatus !== 'FAILED' && item.quantity <= 0,
     }));
 
     return { data, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
@@ -77,9 +79,9 @@ export class InventoryService {
 
     return {
       ...inventory,
-      available: inventory.trackQuantity ? Math.max(0, inventory.quantity - inventory.reservedQuantity) : null,
-      isLowStock: inventory.trackQuantity && inventory.quantity > 0 && inventory.quantity <= inventory.lowStockThreshold,
-      isOutOfStock: inventory.trackQuantity && inventory.quantity <= 0,
+      available: inventory.trackQuantity && inventory.syncStatus !== 'FAILED' ? Math.max(0, inventory.quantity - inventory.reservedQuantity) : null,
+      isLowStock: inventory.trackQuantity && inventory.syncStatus !== 'FAILED' && inventory.quantity > 0 && inventory.quantity <= inventory.lowStockThreshold,
+      isOutOfStock: inventory.trackQuantity && inventory.syncStatus !== 'FAILED' && inventory.quantity <= 0,
     };
   }
 
@@ -99,9 +101,9 @@ export class InventoryService {
 
     return {
       ...inventory,
-      available: inventory.trackQuantity ? Math.max(0, inventory.quantity - inventory.reservedQuantity) : null,
-      isLowStock: inventory.trackQuantity && inventory.quantity > 0 && inventory.quantity <= inventory.lowStockThreshold,
-      isOutOfStock: inventory.trackQuantity && inventory.quantity <= 0,
+      available: inventory.trackQuantity && inventory.syncStatus !== 'FAILED' ? Math.max(0, inventory.quantity - inventory.reservedQuantity) : null,
+      isLowStock: inventory.trackQuantity && inventory.syncStatus !== 'FAILED' && inventory.quantity > 0 && inventory.quantity <= inventory.lowStockThreshold,
+      isOutOfStock: inventory.trackQuantity && inventory.syncStatus !== 'FAILED' && inventory.quantity <= 0,
     };
   }
 
@@ -252,6 +254,7 @@ export class InventoryService {
       where: {
         trackQuantity: true,
         quantity: { lte: 0 },
+        syncStatus: { not: 'FAILED' },
       },
       include: {
         product: { select: { id: true, name: true, sku: true, status: true } },
@@ -265,13 +268,13 @@ export class InventoryService {
       this.prisma.inventory.count(),
       this.prisma.inventory.count({ where: { trackQuantity: true } }),
       this.prisma.inventory.count({
-        where: { trackQuantity: true, quantity: { gt: 0, lte: 10 } },
+        where: { trackQuantity: true, syncStatus: { not: 'FAILED' }, quantity: { gt: 0, lte: 10 } },
       }),
       this.prisma.inventory.count({
-        where: { trackQuantity: true, quantity: { lte: 0 } },
+        where: { trackQuantity: true, syncStatus: { not: 'FAILED' }, quantity: { lte: 0 } },
       }),
       this.prisma.inventory.aggregate({
-        where: { trackQuantity: true },
+        where: { trackQuantity: true, syncStatus: { not: 'FAILED' } },
         _sum: { quantity: true },
       }),
     ]);

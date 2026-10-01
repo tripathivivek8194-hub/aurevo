@@ -509,5 +509,45 @@ describe('AliExpressAdapter', () => {
       expect(params.ship_to_country).toBe('BR');
       expect(params.product_ids).toBeUndefined();
     });
+
+    it('parses the official direct result shape and documented SKU stock fields', async () => {
+      const adapter = makeAdapter('tok');
+      mockedAxios.post.mockResolvedValue({
+        status: 200,
+        data: {
+          aliexpress_ds_product_get_response: {
+            result: {
+              product_id: '222',
+              ae_item_sku_info_dtos: [
+                { id: 'official-1', ipm_sku_stock: 17, sku_stock: true },
+                { id: 'official-2', sku_stock: true },
+              ],
+            },
+          },
+        },
+      });
+
+      const inventory = await adapter.getDropshippingInventory('222', 'IN');
+      expect(inventory.variants).toEqual([
+        { variantId: 'official-1', quantity: 17, available: true },
+        { variantId: 'official-2', quantity: 1, available: true },
+      ]);
+    });
+
+    it('rejects unrecognized stock instead of fabricating zero', async () => {
+      const adapter = makeAdapter('tok');
+      mockedAxios.post.mockResolvedValue({
+        status: 200,
+        data: {
+          aliexpress_ds_product_get_response: {
+            result: { product_id: '333', ae_item_sku_info_dtos: [{ id: 'unknown' }] },
+          },
+        },
+      });
+
+      await expect(adapter.getDropshippingInventory('333', 'IN')).rejects.toThrow(
+        'without a recognized stock field',
+      );
+    });
   });
 });

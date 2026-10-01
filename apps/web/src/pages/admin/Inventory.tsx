@@ -14,6 +14,7 @@ interface InventoryRow {
   lowStockThreshold: number;
   trackQuantity: boolean;
   allowBackorder: boolean;
+  syncStatus?: string | null;
   available: number | null;
   isLowStock: boolean;
   isOutOfStock: boolean;
@@ -222,6 +223,7 @@ export function Inventory() {
       header: 'Status',
       render: (row) => {
         if (!row.trackQuantity) return <Badge variant="outline" size="sm">Not tracked</Badge>;
+        if (row.syncStatus === 'FAILED') return <Badge variant="warning" size="sm">Stock unknown</Badge>;
         if (row.isOutOfStock) return <Badge variant="error" size="sm">Out of stock</Badge>;
         if (row.isLowStock) return <Badge variant="warning" size="sm">Low stock</Badge>;
         return <Badge variant="success" size="sm">In stock</Badge>;

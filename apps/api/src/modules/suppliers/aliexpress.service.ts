@@ -747,6 +747,12 @@ export class AliExpressService {
         }
       } catch {
         // One unavailable supplier product must never stop the remaining sync.
+        // Preserve its last quantity but mark it unverified instead of
+        // presenting an unrecognized supplier response as confirmed zero.
+        await this.prisma.inventory.updateMany({
+          where: { productId: product.id },
+          data: { syncStatus: 'FAILED', lastSyncedAt: new Date() },
+        });
         skipped++;
         failedFetches++;
       }
