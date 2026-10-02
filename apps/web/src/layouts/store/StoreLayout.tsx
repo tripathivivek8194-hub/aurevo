@@ -182,11 +182,7 @@ export function StoreLayout() {
             </nav>            {/* Desktop search */}
             <form
               onSubmit={handleSearch}
-              className={`hidden shrink-0 md:block overflow-hidden transition-all duration-300 ease-out lg:ml-auto ${
-                desktopSearchOpen || search.trim()
-                  ? 'md:w-[320px] xl:w-[360px]'
-                  : 'md:w-10'
-              }`}
+              className="hidden shrink-0 md:block md:w-12 lg:ml-auto overflow-hidden transition-all duration-300 ease-out focus-within:md:w-[320px] xl:focus-within:w-[360px]"
             >
               <div className="relative w-full">
                 <span
@@ -216,7 +212,7 @@ export function StoreLayout() {
                   onBlur={() => {
                     if (!search.trim()) setDesktopSearchOpen(false);
                   }}
-                  placeholder={desktopSearchOpen ? 'Search AUREVO' : ''}
+                  placeholder="Search AUREVO"
                   aria-label="Search products"
                   className="h-10 w-full rounded-full border border-[var(--color-border)] bg-[var(--color-background-secondary)] pl-11 pr-4 text-sm text-[var(--color-text-primary)] outline-none transition-all duration-300 placeholder:text-[var(--color-text-tertiary)] focus:border-[var(--color-border-focus)] focus:ring-2 focus:ring-[var(--color-border-focus)]/20"
                 />
@@ -583,7 +579,7 @@ export function StoreLayout() {
               onChange={(e) => setSearch(e.target.value)}
                   onFocus={() => setDesktopSearchOpen(true)}
                   onBlur={() => { if (!search.trim()) setDesktopSearchOpen(false); }}
-                  placeholder={desktopSearchOpen ? 'Search AUREVO' : ''}
+                  placeholder="Search AUREVO"
               aria-label="Search products"
               className="h-10 w-full rounded-full border border-[var(--color-border)] bg-[var(--color-background-secondary)] pl-11 pr-4 text-sm text-[var(--color-text-primary)] outline-none transition-all placeholder:text-[var(--color-text-tertiary)] focus:border-[var(--color-border-focus)] focus:ring-2 focus:ring-[var(--color-border-focus)]/20"
             />
