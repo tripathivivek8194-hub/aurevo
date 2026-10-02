@@ -26,36 +26,11 @@ style.textContent = generateAllCSS();
 document.head.appendChild(style);
 
 
-window.addEventListener('vite:preloadError', (event) => {
-  event.preventDefault();
-
-  const key = 'aurevo-preload-reload';
-
-  if (!sessionStorage.getItem(key)) {
-    sessionStorage.setItem(key, '1');
-    window.location.reload();
-  } else {
-    sessionStorage.removeItem(key);
-  }
-});
 const rootEl = document.getElementById('root');
 if (!rootEl) {
   throw new Error('Root element #root not found');
 }
 
-
-window.addEventListener('vite:preloadError', (event) => {
-  event.preventDefault();
-
-  const key = 'aurevo-preload-reload';
-
-  if (!sessionStorage.getItem(key)) {
-    sessionStorage.setItem(key, '1');
-    window.location.reload();
-  } else {
-    sessionStorage.removeItem(key);
-  }
-});
 ReactDOM.createRoot(rootEl).render(
   <React.StrictMode>
     <ErrorBoundary>

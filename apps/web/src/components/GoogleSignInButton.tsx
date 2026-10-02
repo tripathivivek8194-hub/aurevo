@@ -40,6 +40,8 @@ export function GoogleSignInButton({
 
   useEffect(() => {
     let cancelled = false;
+    let resizeObserver: ResizeObserver | null = null;
+    let renderedWidth = 0;
 
     const initializeGoogle = () => {
       if (
@@ -57,8 +59,6 @@ export function GoogleSignInButton({
         return;
       }
 
-      containerRef.current.innerHTML = '';
-
       window.google.accounts.id.initialize({
         client_id: clientId,
         callback: (response) => {
@@ -67,17 +67,32 @@ export function GoogleSignInButton({
         ux_mode: 'popup',
       });
 
-      window.google.accounts.id.renderButton(
-        containerRef.current,
-        {
+      const renderButton = () => {
+        const container = containerRef.current;
+        if (!container || !window.google) return;
+
+        const availableWidth = Math.floor(container.clientWidth);
+        if (availableWidth <= 0) return;
+
+        const width = Math.min(384, Math.max(200, availableWidth));
+        if (Math.abs(width - renderedWidth) < 2) return;
+
+        renderedWidth = width;
+        container.innerHTML = '';
+        window.google.accounts.id.renderButton(container, {
           type: 'standard',
           theme: 'outline',
           size: 'large',
           text: label,
           shape: 'pill',
-          width: 384,
-        },
-      );
+          width,
+        });
+      };
+
+      renderButton();
+      resizeObserver?.disconnect();
+      resizeObserver = new ResizeObserver(renderButton);
+      resizeObserver.observe(containerRef.current);
     };
 
     const existingScript = document.querySelector(
@@ -105,13 +120,14 @@ export function GoogleSignInButton({
 
     return () => {
       cancelled = true;
+      resizeObserver?.disconnect();
     };
   }, []);
 
   return (
     <div
       ref={containerRef}
-      className="flex min-h-10 justify-center"
+      className="flex min-h-10 w-full min-w-0 justify-center overflow-hidden"
     />
   );
 }

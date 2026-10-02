@@ -174,17 +174,19 @@ export function generateThemeCSS(theme: Record<string, string>): string {
 
 export function generateAllCSS(): string {
   const sections = [
+    ':root {',
     '/* Typography */',
-    generateThemeCSS(typographyVariables),
+    generateThemeCSS(typographyVariables).replace(/^/gm, '  '),
     '',
     '/* Spacing */',
-    generateThemeCSS(spacingVariables),
+    generateThemeCSS(spacingVariables).replace(/^/gm, '  '),
     '',
     '/* Border Radius */',
-    generateThemeCSS(borderRadiusVariables),
+    generateThemeCSS(borderRadiusVariables).replace(/^/gm, '  '),
     '',
     '/* Transitions */',
-    generateThemeCSS(transitionVariables),
+    generateThemeCSS(transitionVariables).replace(/^/gm, '  '),
+    '}',
     '',
     '/* Light Theme (default) */',
     ':root, [data-theme="light"] {',

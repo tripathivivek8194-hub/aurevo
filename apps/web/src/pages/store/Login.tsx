@@ -142,8 +142,8 @@ export function Login() {
         </section>
 
         {/* Login panel */}
-        <section className="flex min-h-[100dvh] items-center justify-center px-4 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-8 sm:py-10 lg:min-h-0 lg:px-12 xl:px-20">
-          <div className="w-full max-w-md">
+        <section className="flex min-h-[100dvh] min-w-0 items-center justify-center overflow-hidden px-4 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-8 sm:py-10 lg:min-h-0 lg:px-12 xl:px-20">
+          <div className="w-full min-w-0 max-w-md">
             {/* Mobile brand */}
             <div className="mb-10 lg:hidden">
               <Link
