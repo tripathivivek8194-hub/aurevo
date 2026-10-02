@@ -182,7 +182,7 @@ export function StoreLayout() {
             </nav>            {/* Desktop search */}
             <form
               onSubmit={handleSearch}
-              className="hidden shrink-0 md:block md:w-12 lg:ml-auto overflow-hidden transition-all duration-300 ease-out focus-within:md:w-[320px] xl:focus-within:w-[360px]"
+              className="hidden shrink-0 md:block md:w-11 lg:ml-auto transition-[width] duration-300 ease-out focus-within:md:w-[320px] xl:focus-within:w-[360px]"
             >
               <div className="relative w-full">
                 <span
@@ -214,7 +214,7 @@ export function StoreLayout() {
                   }}
                   placeholder="Search AUREVO"
                   aria-label="Search products"
-                  className="h-10 w-full rounded-full border border-[var(--color-border)] bg-[var(--color-background-secondary)] pl-11 pr-4 text-sm text-[var(--color-text-primary)] outline-none transition-all duration-300 placeholder:text-[var(--color-text-tertiary)] focus:border-[var(--color-border-focus)] focus:ring-2 focus:ring-[var(--color-border-focus)]/20"
+                  className="h-11 min-w-0 w-full rounded-full border border-[var(--color-border)] bg-[var(--color-background-secondary)] pl-11 pr-4 text-sm text-[var(--color-text-primary)] outline-none transition-all duration-300 placeholder:text-[var(--color-text-tertiary)] focus:border-[var(--color-border-focus)] focus:ring-2 focus:ring-[var(--color-border-focus)]/20"
                 />
               </div>
             </form>
@@ -581,7 +581,7 @@ export function StoreLayout() {
                   onBlur={() => { if (!search.trim()) setDesktopSearchOpen(false); }}
                   placeholder="Search AUREVO"
               aria-label="Search products"
-              className="h-10 w-full rounded-full border border-[var(--color-border)] bg-[var(--color-background-secondary)] pl-11 pr-4 text-sm text-[var(--color-text-primary)] outline-none transition-all placeholder:text-[var(--color-text-tertiary)] focus:border-[var(--color-border-focus)] focus:ring-2 focus:ring-[var(--color-border-focus)]/20"
+              className="h-11 min-w-0 w-full rounded-full border border-[var(--color-border)] bg-[var(--color-background-secondary)] pl-11 pr-4 text-sm text-[var(--color-text-primary)] outline-none transition-all placeholder:text-[var(--color-text-tertiary)] focus:border-[var(--color-border-focus)] focus:ring-2 focus:ring-[var(--color-border-focus)]/20"
             />
           </div>
         </form>
