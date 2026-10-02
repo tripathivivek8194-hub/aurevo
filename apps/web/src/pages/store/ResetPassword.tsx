@@ -9,6 +9,7 @@ import {
 } from '@aurevo/design-system';
 import { api } from '../../lib/api';
 import { useSeo } from '../../hooks/useSeo';
+import { PasswordInput } from '../../components/PasswordInput';
 
 export function ResetPassword() {
   const navigate = useNavigate();
@@ -250,9 +251,8 @@ export function ResetPassword() {
                     <div className="space-y-2">
                       <Label htmlFor="password">New password</Label>
 
-                      <Input
+                      <PasswordInput
                         id="password"
-                        type="password"
                         autoComplete="new-password"
                         required
                         minLength={8}
@@ -272,9 +272,8 @@ export function ResetPassword() {
                         Confirm new password
                       </Label>
 
-                      <Input
+                      <PasswordInput
                         id="confirm"
-                        type="password"
                         autoComplete="new-password"
                         required
                         minLength={8}

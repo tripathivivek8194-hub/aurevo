@@ -12,6 +12,7 @@ import { useSeo } from '../../hooks/useSeo';
 import { BrandLogo } from '../../components/BrandLogo';
 import { useAuthStore } from '../../stores/auth';
 import { GoogleSignInButton } from '../../components/GoogleSignInButton';
+import { PasswordInput } from '../../components/PasswordInput';
 
 /**
  * Customer registration.
@@ -225,7 +226,7 @@ export function Register() {
         </section>
 
         {/* Registration panel */}
-        <section className="flex min-h-screen items-center justify-center px-5 py-10 sm:px-8 lg:min-h-0 lg:px-12 xl:px-20">
+        <section className="flex min-h-[100dvh] items-center justify-center px-4 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-8 sm:py-10 lg:min-h-0 lg:px-12 xl:px-20">
           <div className="w-full max-w-md">
             {/* Mobile brand */}
             <div className="mb-10 lg:hidden">
@@ -306,9 +307,8 @@ export function Register() {
                 <div className="space-y-2">
                   <Label htmlFor="password">Password</Label>
 
-                  <Input
+                  <PasswordInput
                     id="password"
-                    type="password"
                     autoComplete="new-password"
                     required
                     placeholder="At least 8 characters"
@@ -325,9 +325,8 @@ export function Register() {
                 <div className="space-y-2">
                   <Label htmlFor="confirm">Confirm password</Label>
 
-                  <Input
+                  <PasswordInput
                     id="confirm"
-                    type="password"
                     autoComplete="new-password"
                     required
                     value={confirm}
@@ -336,18 +335,20 @@ export function Register() {
                   />
                 </div>
 
-                <Button
-                  type="submit"
-                  variant="primary"
-                  className="h-12 w-full"
-                  disabled={submitting || googleSubmitting}
-                >
-                  {submitting ? (
-                    <Spinner size="sm" label="Creating account…" />
-                  ) : (
-                    'Create account'
-                  )}
-                </Button>
+                <div className="pt-1">
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    className="h-12 w-full"
+                    disabled={submitting || googleSubmitting}
+                  >
+                    {submitting ? (
+                      <Spinner size="sm" label="Creating account…" />
+                    ) : (
+                      'Create account'
+                    )}
+                  </Button>
+                </div>
               </form>
 
               <div className="my-6 flex items-center gap-4">

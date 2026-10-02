@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Alert, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label, Spinner } from '@aurevo/design-system';
 import { useSeo } from '../../hooks/useSeo';
 import { useAuthStore, isAdmin } from '../../stores/auth';
+import { PasswordInput } from '../../components/PasswordInput';
 
 export function Login() {
   const navigate = useNavigate();
@@ -40,7 +41,7 @@ export function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-8 bg-[var(--color-background-primary)]">
+    <div className="flex min-h-[100dvh] items-center justify-center bg-[var(--color-background-primary)] p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-8">
       <Card variant="elevated" className="w-full max-w-sm">
         <CardHeader>
           <CardTitle as="h1">AUREVO Admin</CardTitle>
@@ -65,18 +66,19 @@ export function Login() {
             </div>
             <div className="space-y-1">
               <Label htmlFor="password">Password</Label>
-              <Input
+              <PasswordInput
                 id="password"
-                type="password"
                 autoComplete="current-password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
             </div>
-            <Button type="submit" variant="primary" className="w-full" disabled={submitting}>
-              {submitting ? <Spinner size="sm" label="Signing in…" /> : 'Sign in'}
-            </Button>
+            <div className="pt-1">
+              <Button type="submit" variant="primary" className="h-12 w-full" disabled={submitting}>
+                {submitting ? <Spinner size="sm" label="Signing in…" /> : 'Sign in'}
+              </Button>
+            </div>
           </form>
         </CardContent>
       </Card>

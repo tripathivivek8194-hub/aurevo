@@ -267,7 +267,7 @@ export function Inventory() {
       </div>
 
       {/* Stat cards */}
-      <div className="mt-4 grid grid-cols-2 lg:grid-cols-5 gap-3">
+      <div className="mt-4 grid grid-cols-1 min-[360px]:grid-cols-2 lg:grid-cols-5 gap-3">
         {[
           { label: 'Records', value: stats?.totalProducts, tone: 'text-[var(--color-text-primary)]' },
           { label: 'Tracking qty', value: stats?.trackingProducts, tone: 'text-[var(--color-text-primary)]' },
@@ -290,7 +290,7 @@ export function Inventory() {
         </Alert>
       )}
 
-      <div className="mt-4">
+      <div className="mt-4 -mx-3 overflow-x-auto px-3 sm:mx-0 sm:px-0">
         <Table
           columns={columns}
           data={rows}
