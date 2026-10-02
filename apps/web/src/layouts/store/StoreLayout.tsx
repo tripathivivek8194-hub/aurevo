@@ -23,6 +23,8 @@ export function StoreLayout() {
   const { count, refresh, mergeSessionIntoUser } = useCartStore();
 
   const [search, setSearch] = useState('');
+  const [desktopSearchOpen, setDesktopSearchOpen] = useState(false);
+  const [desktopSearchOpen, setDesktopSearchOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [categories, setCategories] = useState<CategorySummary[]>([]);
@@ -181,9 +183,9 @@ export function StoreLayout() {
             {/* Desktop search */}
             <form
               onSubmit={handleSearch}
-              className="hidden min-w-0 flex-1 md:block lg:ml-auto"
+              className="hidden md:block md:w-[260px] lg:w-[320px] xl:w-[360px] 2xl:ml-auto"
             >
-              <div className="relative mx-auto max-w-xl">
+              <div className="relative w-full">
                 <span
                   className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[var(--color-text-tertiary)]"
                   aria-hidden="true"
