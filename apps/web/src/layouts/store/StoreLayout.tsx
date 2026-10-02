@@ -24,7 +24,8 @@ export function StoreLayout() {
 
   const [search, setSearch] = useState('');
   const [desktopSearchOpen, setDesktopSearchOpen] = useState(false);
-  const [desktopSearchOpen, setDesktopSearchOpen] = useState(false);
+
+
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [categories, setCategories] = useState<CategorySummary[]>([]);
@@ -178,12 +179,14 @@ export function StoreLayout() {
                   {titleCase(cat.name)}
                 </NavLink>
               ))}
-            </nav>
-
-            {/* Desktop search */}
+            </nav>            {/* Desktop search */}
             <form
               onSubmit={handleSearch}
-              className="hidden md:block md:w-[260px] lg:w-[320px] xl:w-[360px] 2xl:ml-auto"
+              className={`hidden shrink-0 md:block overflow-hidden transition-all duration-300 ease-out lg:ml-auto ${
+                desktopSearchOpen || search.trim()
+                  ? 'md:w-[320px] xl:w-[360px]'
+                  : 'md:w-10'
+              }`}
             >
               <div className="relative w-full">
                 <span
@@ -208,9 +211,14 @@ export function StoreLayout() {
 
                 <input
                   value={search}
-                  onChange={(e) => setSearch(e.target.value)}`r`n                  onFocus={() => setDesktopSearchOpen(true)}`r`n                  onBlur={() => { if (!search.trim()) setDesktopSearchOpen(false); }}`r`n                  placeholder={desktopSearchOpen ? "Search AUREVO" : ""}
+                  onChange={(e) => setSearch(e.target.value)}
+                  onFocus={() => setDesktopSearchOpen(true)}
+                  onBlur={() => {
+                    if (!search.trim()) setDesktopSearchOpen(false);
+                  }}
+                  placeholder={desktopSearchOpen ? 'Search AUREVO' : ''}
                   aria-label="Search products"
-                  className="h-10 w-full rounded-full border border-[var(--color-border)] bg-[var(--color-background-secondary)] pl-11 pr-4 text-sm text-[var(--color-text-primary)] outline-none transition-all placeholder:text-[var(--color-text-tertiary)] focus:border-[var(--color-border-focus)] focus:ring-2 focus:ring-[var(--color-border-focus)]/20"
+                  className="h-10 w-full rounded-full border border-[var(--color-border)] bg-[var(--color-background-secondary)] pl-11 pr-4 text-sm text-[var(--color-text-primary)] outline-none transition-all duration-300 placeholder:text-[var(--color-text-tertiary)] focus:border-[var(--color-border-focus)] focus:ring-2 focus:ring-[var(--color-border-focus)]/20"
                 />
               </div>
             </form>
