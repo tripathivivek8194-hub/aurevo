@@ -148,7 +148,7 @@ export function StoreLayout() {
 
             {/* Desktop category navigation */}
             <nav
-              className="hidden shrink-0 items-center gap-1 lg:flex"
+              className={desktopSearchOpen || search.trim() ? 'hidden' : 'hidden shrink-0 items-center gap-1 lg:flex'}
               aria-label="Primary navigation"
             >
               <NavLink
