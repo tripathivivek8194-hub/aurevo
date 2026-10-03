@@ -12,7 +12,9 @@ const rows = JSON.parse(await fs.readFile(inputPath, 'utf8'));
 
 function cleanBaseName(value) {
   const withoutOldQuantity = String(value ?? '')
+    .replace(/\s*\(\d+\s+pairs?\s*\(\d+\s*(?:pc|pcs|piece|pieces)\)\)\s*$/i, '')
     .replace(/\s*\((?:[^()]*(?:pc|pcs|piece|pieces|pair|pairs|set|pack)[^()]*)\)\s*$/i, '')
+    .replace(/^\d+\s*pairs?\s+(?:set\s+)?/i, '')
     .replace(/\s+/g, ' ')
     .trim();
 
@@ -29,6 +31,11 @@ function cleanBaseName(value) {
 function quantityLabel(value) {
   if (typeof value === 'number') return value === 1 ? '1 pc' : `${value} pcs`;
   const normalized = String(value ?? '').trim().replace(/pieces?/gi, 'pcs');
+  const pairMatch = normalized.match(/^(\d+)\s+pairs?\s*\((\d+)\s+pcs\)$/i);
+  if (pairMatch) {
+    const pairWord = pairMatch[1] === '1' ? 'pair' : 'pairs';
+    return `${pairMatch[1]} ${pairWord} / ${pairMatch[2]} pcs`;
+  }
   if (/^\d+(?:\s*\/\s*\d+)+$/.test(normalized)) return `${normalized.replace(/\s+/g, '')} pcs options`;
   return normalized || 'quantity varies by option';
 }
