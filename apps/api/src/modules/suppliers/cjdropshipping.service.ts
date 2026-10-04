@@ -683,7 +683,7 @@ export class CJDropshippingService {
     // CJ imports store their supplier link directly on Product.  Older imports
     // did not create SupplierProduct rows, so reading that table leaves every
     // imported CJ product untracked even though it is linked correctly.
-    const candidates = await this.prisma.product.findMany({
+    const products = await this.prisma.product.findMany({
       where: {
         OR: [
           { supplierId: supplier.id, supplierProductId: { not: null } },
@@ -692,22 +692,33 @@ export class CJDropshippingService {
           // import identity, not a user-entered guess.
           { sku: { startsWith: 'CJ-' } },
         ],
+        ...(checkedBefore
+          ? {
+              AND: [
+                {
+                  OR: [
+                    { inventory: { none: { variantId: null } } },
+                    {
+                      inventory: {
+                        some: {
+                          variantId: null,
+                          OR: [
+                            { lastSyncedAt: null },
+                            { lastSyncedAt: { lt: checkedBefore } },
+                          ],
+                        },
+                      },
+                    },
+                  ],
+                },
+              ],
+            }
+          : {}),
       },
+      orderBy: { updatedAt: 'asc' },
+      take: maxProducts,
       include: { variants: { include: { inventory: true } }, inventory: true },
     });
-    // Run the oldest product checks first. This keeps the scheduler below its
-    // request timeout while ensuring every linked product is refreshed over
-    // successive runs instead of repeatedly checking only the first page.
-    const lastSyncAt = (product: (typeof candidates)[number]) =>
-      Math.max(
-        0,
-        ...product.inventory.map((inventory) => inventory.lastSyncedAt?.getTime() ?? 0),
-        ...product.variants.map((variant) => variant.inventory?.lastSyncedAt?.getTime() ?? 0),
-      );
-    const products = candidates
-      .filter((product) => !checkedBefore || lastSyncAt(product) < checkedBefore.getTime())
-      .sort((left, right) => lastSyncAt(left) - lastSyncAt(right))
-      .slice(0, maxProducts);
     let updated = 0;
     let skipped = 0;
     let archivedForIndia = 0;

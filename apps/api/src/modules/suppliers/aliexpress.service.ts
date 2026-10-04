@@ -624,23 +624,36 @@ export class AliExpressService {
     // A full catalog can contain thousands of supplier SKUs.  A hosted
     // scheduler request has a finite lifetime, so select the least recently
     // checked products and let successive runs rotate through the catalog.
-    const candidates = await this.prisma.product.findMany({
+    const products = await this.prisma.product.findMany({
       where: {
         supplierId: supplier.id,
         supplierProductId: { not: null },
+        ...(checkedBefore
+          ? {
+              OR: [
+                { inventory: { none: { variantId: null } } },
+                {
+                  inventory: {
+                    some: {
+                      variantId: null,
+                      OR: [
+                        { lastSyncedAt: null },
+                        { lastSyncedAt: { lt: checkedBefore } },
+                      ],
+                    },
+                  },
+                },
+              ],
+            }
+          : {}),
       },
+      // updatedAt changes when the shipping audit is saved, so ordinary
+      // scheduler runs naturally rotate through the least-recently touched
+      // products. Full passes use the inventory timestamp filter above.
+      orderBy: { updatedAt: 'asc' },
+      take: maxProducts,
       include: { variants: { include: { inventory: true } }, inventory: true },
     });
-    const lastSyncAt = (product: (typeof candidates)[number]) =>
-      Math.max(
-        0,
-        ...product.inventory.map((inventory) => inventory.lastSyncedAt?.getTime() ?? 0),
-        ...product.variants.map((variant) => variant.inventory?.lastSyncedAt?.getTime() ?? 0),
-      );
-    const products = candidates
-      .filter((product) => !checkedBefore || lastSyncAt(product) < checkedBefore.getTime())
-      .sort((left, right) => lastSyncAt(left) - lastSyncAt(right))
-      .slice(0, maxProducts);
 
     let updated = 0;
     let skipped = 0;
