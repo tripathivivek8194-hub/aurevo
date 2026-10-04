@@ -69,6 +69,13 @@ export interface CJDropshippingAdapterConfig {
   http?: AxiosInstance;
 }
 
+export interface CJShippingAvailability {
+  status: 'AVAILABLE' | 'UNAVAILABLE' | 'UNKNOWN';
+  country: string;
+  checkedAt: string;
+  reason?: string;
+}
+
 /** CJ API v2.0 method paths (relative to the base URL). Verified from
  *  developers.cjdropshipping.com — product endpoints are GET, auth/order are POST. */
 const ENDPOINTS = {
@@ -80,6 +87,7 @@ const ENDPOINTS = {
   listProducts: 'product/listV2',
   queryProduct: 'product/query',
   queryStock: 'product/stock/queryByVid',
+  queryInventoryByPid: 'product/stock/getInventoryByPid',
   // Orders (POST)
   createOrder: 'shopping/order/createOrder',
   queryOrderList: 'shopping/order/queryOrderList',
@@ -87,7 +95,7 @@ const ENDPOINTS = {
   cancelOrder: 'shopping/order/cancelOrder',
   // Logistics
   queryLogisticsShippingMethod: 'logistic/queryLogisticsShippingMethod',
-  getFreight: 'logistic/getFreight',
+  getFreight: 'logistic/freightCalculate',
 } as const;
 
 const DEFAULT_BASE_URL = 'https://developers.cjdropshipping.com/api2.0/v1';
@@ -437,6 +445,82 @@ export class CJDropshippingAdapter implements SupplierAdapter {
       variants.push({ variantId: vid, quantity: qty, available: qty > 0 });
     }
     return { productId: supplierProductId, variants };
+  }
+
+  /** Verify that CJ returns at least one freight route to the destination. */
+  async getShippingAvailability(
+    supplierProductId: string,
+    country = 'IN',
+  ): Promise<CJShippingAvailability> {
+    const destination = country.trim().toUpperCase();
+    const checkedAt = new Date().toISOString();
+    try {
+      const stock = await this.authedGetRequest<any>(ENDPOINTS.queryInventoryByPid, {
+        pid: supplierProductId,
+      });
+      const variantInventories = Array.isArray(stock?.data?.variantInventories)
+        ? stock.data.variantInventories
+        : [];
+      const candidates: Array<{ vid: string; origin: string; quantity: number }> = [];
+      for (const variant of variantInventories) {
+        const vid = String(variant?.vid ?? '');
+        if (!vid || !Array.isArray(variant?.inventory)) continue;
+        for (const warehouse of variant.inventory) {
+          const origin = String(warehouse?.countryCode ?? '').toUpperCase();
+          const quantity = this.readCjWarehouseQuantity(warehouse);
+          if (origin && quantity > 0) candidates.push({ vid, origin, quantity });
+        }
+      }
+
+      if (!candidates.length) {
+        return {
+          status: 'UNKNOWN',
+          country: destination,
+          checkedAt,
+          reason: 'CJ returned no in-stock variant and warehouse pair to test.',
+        };
+      }
+
+      // Test the best-stocked representative for every origin warehouse. CJ
+      // freight rules are product-level in normal catalog items; checking each
+      // origin avoids falsely rejecting a product that ships from another CJ
+      // warehouse while keeping the scheduled API cost bounded.
+      const representatives = new Map<string, { vid: string; origin: string; quantity: number }>();
+      for (const candidate of candidates) {
+        const existing = representatives.get(candidate.origin);
+        if (!existing || candidate.quantity > existing.quantity) {
+          representatives.set(candidate.origin, candidate);
+        }
+      }
+
+      for (const candidate of representatives.values()) {
+        const freight = await this.authedRequest<any>(ENDPOINTS.getFreight, {
+          startCountryCode: candidate.origin,
+          endCountryCode: destination,
+          products: [{ quantity: 1, vid: candidate.vid }],
+        });
+        const methods = Array.isArray(freight?.data) ? freight.data : [];
+        if (methods.length > 0) {
+          return { status: 'AVAILABLE', country: destination, checkedAt };
+        }
+      }
+
+      return {
+        status: 'UNAVAILABLE',
+        country: destination,
+        checkedAt,
+        reason: `CJ returned no freight route to ${destination} from any stocked warehouse.`,
+      };
+    } catch (error) {
+      return {
+        status: 'UNKNOWN',
+        country: destination,
+        checkedAt,
+        reason: error instanceof SupplierApiError
+          ? error.message
+          : 'CJ freight availability could not be verified.',
+      };
+    }
   }
 
   async getPrice(supplierProductId: string, variantIds?: string[]): Promise<PriceResult> {

@@ -549,5 +549,71 @@ describe('AliExpressAdapter', () => {
         'without a recognized stock field',
       );
     });
+
+    it('confirms India shipping only when at least one freight option succeeds', async () => {
+      const adapter = makeAdapter('tok');
+      mockedAxios.post.mockResolvedValue({
+        status: 200,
+        data: {
+          aliexpress_logistics_buyer_freight_calculate_response: {
+            result: {
+              aeop_freight_calculate_result_for_buyer_d_t_o_list: {
+                aeop_freight_calculate_result_for_buyer_d_t_o: [
+                  { success: false, error_desc: 'Unavailable lane' },
+                  { success: true, service_name: 'CAINIAO_STANDARD' },
+                ],
+              },
+            },
+          },
+        },
+      });
+
+      const availability = await adapter.getShippingAvailability('444', 'in');
+      expect(availability).toMatchObject({ status: 'AVAILABLE', country: 'IN' });
+      const params = (mockedAxios.post.mock.calls[0][2] as any).params;
+      expect(params.method).toBe('aliexpress.logistics.buyer.freight.calculate');
+      expect(JSON.parse(params.param_aeop_freight_calculate_for_buyer_d_t_o)).toMatchObject({
+        country_code: 'IN',
+        product_id: '444',
+        product_num: 1,
+      });
+    });
+
+    it('marks shipping unavailable only when every returned option explicitly fails', async () => {
+      const adapter = makeAdapter('tok');
+      mockedAxios.post.mockResolvedValue({
+        status: 200,
+        data: {
+          aliexpress_logistics_buyer_freight_calculate_response: {
+            result: {
+              aeop_freight_calculate_result_for_buyer_d_t_o_list: {
+                aeop_freight_calculate_result_for_buyer_d_t_o: [
+                  { success: false, error_desc: 'Cannot deliver to this country' },
+                ],
+              },
+            },
+          },
+        },
+      });
+
+      await expect(adapter.getShippingAvailability('555', 'IN')).resolves.toMatchObject({
+        status: 'UNAVAILABLE',
+        country: 'IN',
+        reason: 'Cannot deliver to this country',
+      });
+    });
+
+    it('keeps shipping unknown on freight API errors so products are not hidden', async () => {
+      const adapter = makeAdapter('tok');
+      mockedAxios.post.mockResolvedValue({
+        status: 200,
+        data: { error_response: { code: 403, msg: 'InsufficientPermission' } },
+      });
+
+      await expect(adapter.getShippingAvailability('666', 'IN')).resolves.toMatchObject({
+        status: 'UNKNOWN',
+        country: 'IN',
+      });
+    });
   });
 });

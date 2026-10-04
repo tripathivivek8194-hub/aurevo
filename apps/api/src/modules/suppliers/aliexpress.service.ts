@@ -615,6 +615,8 @@ export class AliExpressService {
     skipped: number;
     failedFetches: number;
     unmatchedVariants: number;
+    archivedForIndia: number;
+    restoredForIndia: number;
     message?: string;
   }> {
     const adapter = await this.buildAdapter();
@@ -644,12 +646,104 @@ export class AliExpressService {
     let skipped = 0;
     let failedFetches = 0;
     let unmatchedVariants = 0;
+    let archivedForIndia = 0;
+    let restoredForIndia = 0;
 
     for (const product of products) {
       try {
         const sourceProductId = product.supplierProductId!;
         const metadata = this.parseMetadata(product.metadata);
-        const shipToCountry = typeof metadata.country === 'string' && /^[A-Z]{2}$/i.test(metadata.country) ? metadata.country.toUpperCase() : 'IN';
+        // AUREVO sells to India. Import-feed regions describe where the item
+        // was discovered, not the customer's shipping destination.
+        const shipToCountry = 'IN';
+        const previousIndiaCheck =
+          metadata.shippingIndia && typeof metadata.shippingIndia === 'object'
+            ? metadata.shippingIndia as Record<string, unknown>
+            : {};
+        const shipping = await adapter.getShippingAvailability(sourceProductId, shipToCountry);
+        const shippingIndia: Record<string, unknown> = {
+          ...previousIndiaCheck,
+          status: shipping.status,
+          country: shipping.country,
+          checkedAt: shipping.checkedAt,
+          reason: shipping.reason,
+        };
+
+        if (shipping.status === 'UNAVAILABLE') {
+          const wasAutoArchived = previousIndiaCheck.autoArchived === true;
+          const shouldAutoArchive = product.status !== 'ARCHIVED' || wasAutoArchived;
+          if (shouldAutoArchive) {
+            shippingIndia.autoArchived = true;
+            shippingIndia.previousStatus = wasAutoArchived
+              ? previousIndiaCheck.previousStatus ?? 'ACTIVE'
+              : product.status;
+          } else {
+            shippingIndia.autoArchived = false;
+          }
+          await this.prisma.product.update({
+            where: { id: product.id },
+            data: {
+              status: 'ARCHIVED',
+              metadata: JSON.stringify({ ...metadata, shippingIndia }),
+            },
+          });
+          // Record that this product completed the current catalog pass.  The
+          // full-pass scheduler selects products by their inventory sync time;
+          // without this stamp an unavailable product would be selected again
+          // forever and prevent the scan from advancing through the catalog.
+          const productInventory = await this.prisma.inventory.findFirst({
+            where: { productId: product.id, variantId: null },
+            select: { id: true },
+          });
+          const availabilityCheck = {
+            trackQuantity: true,
+            lastSyncedAt: new Date(),
+            syncStatus: 'SYNCED',
+          };
+          if (productInventory) {
+            await this.prisma.inventory.update({
+              where: { id: productInventory.id },
+              data: availabilityCheck,
+            });
+          } else {
+            await this.prisma.inventory.create({
+              data: {
+                productId: product.id,
+                variantId: null,
+                quantity: 0,
+                supplierStock: 0,
+                ...availabilityCheck,
+              },
+            });
+          }
+          archivedForIndia++;
+          skipped++;
+          continue;
+        }
+
+        if (shipping.status === 'AVAILABLE') {
+          const wasAutoArchived = previousIndiaCheck.autoArchived === true;
+          const restoredStatus = previousIndiaCheck.previousStatus === 'DRAFT' ? 'DRAFT' : 'ACTIVE';
+          shippingIndia.autoArchived = false;
+          await this.prisma.product.update({
+            where: { id: product.id },
+            data: {
+              ...(wasAutoArchived && product.status === 'ARCHIVED'
+                ? { status: restoredStatus }
+                : {}),
+              metadata: JSON.stringify({ ...metadata, shippingIndia }),
+            },
+          });
+          if (wasAutoArchived && product.status === 'ARCHIVED') restoredForIndia++;
+        } else {
+          // Save the audit result but do not change visibility on an
+          // inconclusive supplier response.
+          await this.prisma.product.update({
+            where: { id: product.id },
+            data: { metadata: JSON.stringify({ ...metadata, shippingIndia }) },
+          });
+        }
+
         const inventory = await adapter.getDropshippingInventory(sourceProductId, shipToCountry);
 
         // Keep one product-level inventory record even when variants exist.
@@ -766,6 +860,8 @@ export class AliExpressService {
       skipped,
       failedFetches,
       unmatchedVariants,
+      archivedForIndia,
+      restoredForIndia,
     };
   }
 

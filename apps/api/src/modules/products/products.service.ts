@@ -144,8 +144,12 @@ export class ProductsService {
     if (categoryId) {
       where.categoryId = categoryId;
     }
-    if (status) {
-      where.status = status;
+    // Public catalog reads never expose draft/archived products. Admin reads
+    // retain the full status filter for catalog management.
+    if (opts.admin) {
+      if (status) where.status = status;
+    } else {
+      where.status = 'ACTIVE';
     }
     if (isFeatured !== undefined) {
       where.isFeatured = isFeatured;
@@ -189,8 +193,8 @@ export class ProductsService {
   }
 
   async findBySlug(slug: string) {
-    const product = await this.prisma.product.findUnique({
-      where: { slug },
+    const product = await this.prisma.product.findFirst({
+      where: { slug, status: 'ACTIVE' },
       include: {
         category: true,
         images: { orderBy: { sortOrder: 'asc' } },
@@ -215,8 +219,8 @@ export class ProductsService {
   }
 
   async findById(id: string, opts: { admin?: boolean } = {}) {
-    const product = await this.prisma.product.findUnique({
-      where: { id },
+    const product = await this.prisma.product.findFirst({
+      where: opts.admin ? { id } : { id, status: 'ACTIVE' },
       include: {
         category: true,
         images: { orderBy: { sortOrder: 'asc' } },

@@ -76,6 +76,13 @@ export interface AliExpressFeedPage {
   page: number;
 }
 
+export interface AliExpressShippingAvailability {
+  status: 'AVAILABLE' | 'UNAVAILABLE' | 'UNKNOWN';
+  country: string;
+  checkedAt: string;
+  reason?: string;
+}
+
 @Injectable()
 export class AliExpressAdapter implements SupplierAdapter {
   readonly code: SupplierCode = SupplierCode.ALIEXPRESS;
@@ -687,6 +694,86 @@ export class AliExpressAdapter implements SupplierAdapter {
         available: Math.max(0, Number(sku.sku_stock) || 0) > 0,
       })),
     };
+  }
+
+  /**
+   * Check whether AliExpress exposes at least one delivery service to a
+   * destination. An empty/failed freight response is only considered
+   * UNAVAILABLE when AliExpress explicitly returns delivery options and marks
+   * every one as unsuccessful. Permission, rate-limit and transport failures
+   * stay UNKNOWN so a temporary supplier problem can never hide a product.
+   */
+  async getShippingAvailability(
+    supplierProductId: string,
+    country = 'IN',
+  ): Promise<AliExpressShippingAvailability> {
+    const destination = country.trim().toUpperCase();
+    const checkedAt = new Date().toISOString();
+
+    try {
+      const data = await this.request(
+        'POST',
+        'aliexpress.logistics.buyer.freight.calculate',
+        {
+          param_aeop_freight_calculate_for_buyer_d_t_o: JSON.stringify({
+            country_code: destination,
+            product_id: supplierProductId,
+            product_num: 1,
+            send_goods_country_code: 'CN',
+          }),
+        },
+      );
+      const root = this.findMethodRoot(data);
+      const result = root?.result ?? {};
+      const container =
+        result?.aeop_freight_calculate_result_for_buyer_d_t_o_list ?? result;
+      const rawOptions = Array.isArray(container)
+        ? container
+        : container?.aeop_freight_calculate_result_for_buyer_d_t_o ??
+          container?.aeopFreightCalculateResultForBuyerDTOList ??
+          [];
+      const options = Array.isArray(rawOptions)
+        ? rawOptions
+        : rawOptions && typeof rawOptions === 'object'
+          ? [rawOptions]
+          : [];
+
+      if (options.some((option: any) => option?.success === true || option?.success === 'true')) {
+        return { status: 'AVAILABLE', country: destination, checkedAt };
+      }
+
+      if (
+        options.length > 0 &&
+        options.every((option: any) => option?.success === false || option?.success === 'false')
+      ) {
+        const reason = options
+          .map((option: any) => String(option?.error_desc ?? option?.errorDesc ?? '').trim())
+          .filter(Boolean)
+          .join('; ');
+        return {
+          status: 'UNAVAILABLE',
+          country: destination,
+          checkedAt,
+          reason: reason || `No AliExpress delivery service is available to ${destination}.`,
+        };
+      }
+
+      return {
+        status: 'UNKNOWN',
+        country: destination,
+        checkedAt,
+        reason: 'AliExpress did not return a conclusive freight result.',
+      };
+    } catch (error) {
+      return {
+        status: 'UNKNOWN',
+        country: destination,
+        checkedAt,
+        reason: error instanceof SupplierApiError
+          ? error.message
+          : 'AliExpress freight availability could not be verified.',
+      };
+    }
   }
 
   async getPrice(supplierProductId: string, variantIds?: string[]): Promise<PriceResult> {

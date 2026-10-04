@@ -49,7 +49,15 @@ const jobsStore: any[] = [];
 /** Mocked Prisma for the catalog-import path (products/categories/jobs). */
 const prismaMock = {
   category: { findUnique: jest.fn() },
-  product: { findUnique: jest.fn(), create: jest.fn(), update: jest.fn() },
+  product: { findUnique: jest.fn(), findMany: jest.fn(), create: jest.fn(), update: jest.fn() },
+  inventory: {
+    findFirst: jest.fn(),
+    update: jest.fn(),
+    create: jest.fn(),
+    updateMany: jest.fn(),
+    upsert: jest.fn(),
+  },
+  supplier: { update: jest.fn() },
   productImage: {
     deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
     createMany: jest.fn().mockResolvedValue({ count: 0 }),
@@ -633,6 +641,84 @@ describe('AliExpressService catalog import (DS feed)', () => {
     expect(res.error).toContain('InsufficientPermission');
     expect(JSON.stringify(res)).not.toContain('real-secret');
     expect(JSON.stringify(res)).not.toContain('accessToken');
+  });
+});
+
+describe('AliExpressService India shipping enforcement', () => {
+  const product = {
+    id: 'product-1',
+    status: 'ACTIVE',
+    supplierId: 'sup-ali',
+    supplierProductId: '1005001',
+    metadata: JSON.stringify({ country: 'BR' }),
+    inventory: [],
+    variants: [],
+  };
+
+  beforeEach(() => {
+    prismaMock.product.findMany.mockResolvedValue([product]);
+    prismaMock.product.update.mockResolvedValue(product);
+    prismaMock.supplier.update.mockResolvedValue({ id: 'sup-ali' });
+  });
+
+  it('archives a product only after AliExpress explicitly rejects India delivery', async () => {
+    prismaMock.inventory.findFirst.mockResolvedValue(null);
+    prismaMock.inventory.create.mockResolvedValue({ id: 'inventory-india-check' });
+    jest.spyOn(service as any, 'buildAdapter').mockResolvedValue({
+      getShippingAvailability: jest.fn().mockResolvedValue({
+        status: 'UNAVAILABLE',
+        country: 'IN',
+        checkedAt: '2026-10-04T00:00:00.000Z',
+        reason: 'Cannot deliver to this country',
+      }),
+      getDropshippingInventory: jest.fn(),
+    });
+
+    const result = await service.syncInventory(20);
+
+    expect(result.archivedForIndia).toBe(1);
+    expect(prismaMock.product.update).toHaveBeenCalledWith({
+      where: { id: 'product-1' },
+      data: expect.objectContaining({ status: 'ARCHIVED' }),
+    });
+    const metadata = JSON.parse(prismaMock.product.update.mock.calls[0][0].data.metadata);
+    expect(metadata.shippingIndia).toMatchObject({
+      status: 'UNAVAILABLE',
+      country: 'IN',
+      autoArchived: true,
+      previousStatus: 'ACTIVE',
+    });
+    expect(prismaMock.inventory.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        productId: 'product-1',
+        quantity: 0,
+        supplierStock: 0,
+        trackQuantity: true,
+        syncStatus: 'SYNCED',
+        lastSyncedAt: expect.any(Date),
+      }),
+    });
+  });
+
+  it('always checks inventory for India instead of the import feed country', async () => {
+    const getDropshippingInventory = jest.fn().mockResolvedValue({
+      productId: '1005001',
+      variants: [{ variantId: 'default', quantity: 5, available: true }],
+    });
+    jest.spyOn(service as any, 'buildAdapter').mockResolvedValue({
+      getShippingAvailability: jest.fn().mockResolvedValue({
+        status: 'UNKNOWN',
+        country: 'IN',
+        checkedAt: '2026-10-04T00:00:00.000Z',
+      }),
+      getDropshippingInventory,
+    });
+    prismaMock.inventory.findFirst.mockResolvedValue(null);
+    prismaMock.inventory.create.mockResolvedValue({ id: 'inventory-1' });
+
+    await service.syncInventory(20);
+
+    expect(getDropshippingInventory).toHaveBeenCalledWith('1005001', 'IN');
   });
 });
 

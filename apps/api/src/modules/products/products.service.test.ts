@@ -8,7 +8,7 @@ import { ProductsService } from './products.service';
 describe('ProductsService — pagination caps', () => {
   function build() {
     const prisma: any = {
-      product: { findMany: jest.fn(), findUnique: jest.fn(), count: jest.fn(), groupBy: jest.fn(), create: jest.fn(), update: jest.fn(), delete: jest.fn() },
+      product: { findMany: jest.fn(), findFirst: jest.fn(), findUnique: jest.fn(), count: jest.fn(), groupBy: jest.fn(), create: jest.fn(), update: jest.fn(), delete: jest.fn() },
       category: { findUnique: jest.fn() },
       productImage: { findMany: jest.fn(), create: jest.fn(), update: jest.fn(), delete: jest.fn(), deleteMany: jest.fn(), updateMany: jest.fn() },
       $transaction: jest.fn(),
@@ -37,7 +37,7 @@ describe('ProductsService — pagination caps', () => {
     await service.findAll({ page: 1, limit: 20 });
 
     expect(prisma.product.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ take: 20 }),
+      expect.objectContaining({ take: 20, where: expect.objectContaining({ status: 'ACTIVE' }) }),
     );
   });
 
@@ -202,7 +202,7 @@ describe('ProductsService � 30% margin enforcement', () => {
   function buildMargin() {
     const prisma: any = {
       product: {
-        findUnique: jest.fn(), findMany: jest.fn().mockResolvedValue([]),
+        findUnique: jest.fn(), findFirst: jest.fn(), findMany: jest.fn().mockResolvedValue([]),
         count: jest.fn().mockResolvedValue(0), create: jest.fn(), update: jest.fn(),
         delete: jest.fn(), groupBy: jest.fn(),
       },
@@ -318,16 +318,19 @@ describe('ProductsService � 30% margin enforcement', () => {
 
   it('findBySlug strips the cost field from storefront responses', async () => {
     const { service, prisma } = buildMargin();
-    prisma.product.findUnique.mockResolvedValue({ id: 'p1', slug: 'w', cost: COST, basePrice: FLOOR });
+    prisma.product.findFirst.mockResolvedValue({ id: 'p1', slug: 'w', cost: COST, basePrice: FLOOR });
 
     const res = await service.findBySlug('w');
     expect(res).not.toHaveProperty('cost');
     expect(res).toHaveProperty('basePrice');
+    expect(prisma.product.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { slug: 'w', status: 'ACTIVE' } }),
+    );
   });
 
   it('findById strips the cost field from responses', async () => {
     const { service, prisma } = buildMargin();
-    prisma.product.findUnique.mockResolvedValue({ id: 'p1', cost: COST, basePrice: FLOOR });
+    prisma.product.findFirst.mockResolvedValue({ id: 'p1', cost: COST, basePrice: FLOOR });
 
     const res = await service.findById('p1');
     expect(res).not.toHaveProperty('cost');
@@ -340,7 +343,7 @@ describe('ProductsService � 30% margin enforcement', () => {
 
   it('findById(id, { admin: true }) retains cost and adds marginPct', async () => {
     const { service, prisma } = buildMargin();
-    prisma.product.findUnique.mockResolvedValue({ id: 'p1', cost: COST, basePrice: FLOOR });
+    prisma.product.findFirst.mockResolvedValue({ id: 'p1', cost: COST, basePrice: FLOOR });
 
     const res = await service.findById('p1', { admin: true });
     expect(res).toHaveProperty('cost', COST);
@@ -349,7 +352,7 @@ describe('ProductsService � 30% margin enforcement', () => {
 
   it('findById (no opts) must NOT leak marginPct to the storefront', async () => {
     const { service, prisma } = buildMargin();
-    prisma.product.findUnique.mockResolvedValue({ id: 'p1', cost: COST, basePrice: FLOOR });
+    prisma.product.findFirst.mockResolvedValue({ id: 'p1', cost: COST, basePrice: FLOOR });
 
     const res = await service.findById('p1');
     expect(res).not.toHaveProperty('cost');

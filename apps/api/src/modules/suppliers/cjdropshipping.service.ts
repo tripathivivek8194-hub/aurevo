@@ -80,6 +80,16 @@ export class CJDropshippingService {
     return `${key.slice(0, 4)}…${key.slice(-4)}`;
   }
 
+  private parseMetadata(raw: string | null | undefined): Record<string, unknown> {
+    if (!raw) return {};
+    try {
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+
   // -- stored credential access (DB-preferred, env fallback) -------------------
 
   private async storedConfig(): Promise<Record<string, any>> {
@@ -664,6 +674,8 @@ export class CJDropshippingService {
     processed: number;
     updated: number;
     skipped: number;
+    archivedForIndia: number;
+    restoredForIndia: number;
     message?: string;
   }> {
     const adapter = await this.buildAdapter();
@@ -698,6 +710,8 @@ export class CJDropshippingService {
       .slice(0, maxProducts);
     let updated = 0;
     let skipped = 0;
+    let archivedForIndia = 0;
+    let restoredForIndia = 0;
     for (const product of products) {
       try {
         // Older catalog imports stored the CJ identity in the SKU only. The
@@ -706,6 +720,89 @@ export class CJDropshippingService {
         if (!sourceProductId) {
           skipped++;
           continue;
+        }
+        const metadata = this.parseMetadata(product.metadata);
+        const previousIndiaCheck =
+          metadata.shippingIndia && typeof metadata.shippingIndia === 'object'
+            ? metadata.shippingIndia as Record<string, unknown>
+            : {};
+        const shipping = await adapter.getShippingAvailability(sourceProductId, 'IN');
+        const shippingIndia: Record<string, unknown> = {
+          ...previousIndiaCheck,
+          status: shipping.status,
+          country: shipping.country,
+          checkedAt: shipping.checkedAt,
+          reason: shipping.reason,
+        };
+
+        if (shipping.status === 'UNAVAILABLE') {
+          const wasAutoArchived = previousIndiaCheck.autoArchived === true;
+          const shouldAutoArchive = product.status !== 'ARCHIVED' || wasAutoArchived;
+          shippingIndia.autoArchived = shouldAutoArchive;
+          if (shouldAutoArchive) {
+            shippingIndia.previousStatus = wasAutoArchived
+              ? previousIndiaCheck.previousStatus ?? 'ACTIVE'
+              : product.status;
+          }
+          await this.prisma.product.update({
+            where: { id: product.id },
+            data: {
+              status: 'ARCHIVED',
+              metadata: JSON.stringify({ ...metadata, shippingIndia }),
+            },
+          });
+          // Mark the India-delivery check as completed so a full catalog pass
+          // advances to the next product instead of repeatedly selecting this
+          // archived record as the oldest unchecked item.
+          const productInventory = await this.prisma.inventory.findFirst({
+            where: { productId: product.id, variantId: null },
+            select: { id: true },
+          });
+          const availabilityCheck = {
+            trackQuantity: true,
+            lastSyncedAt: new Date(),
+            syncStatus: 'SYNCED',
+          };
+          if (productInventory) {
+            await this.prisma.inventory.update({
+              where: { id: productInventory.id },
+              data: availabilityCheck,
+            });
+          } else {
+            await this.prisma.inventory.create({
+              data: {
+                productId: product.id,
+                variantId: null,
+                quantity: 0,
+                supplierStock: 0,
+                ...availabilityCheck,
+              },
+            });
+          }
+          archivedForIndia++;
+          skipped++;
+          continue;
+        }
+
+        if (shipping.status === 'AVAILABLE') {
+          const wasAutoArchived = previousIndiaCheck.autoArchived === true;
+          const restoredStatus = previousIndiaCheck.previousStatus === 'DRAFT' ? 'DRAFT' : 'ACTIVE';
+          shippingIndia.autoArchived = false;
+          await this.prisma.product.update({
+            where: { id: product.id },
+            data: {
+              ...(wasAutoArchived && product.status === 'ARCHIVED'
+                ? { status: restoredStatus }
+                : {}),
+              metadata: JSON.stringify({ ...metadata, shippingIndia }),
+            },
+          });
+          if (wasAutoArchived && product.status === 'ARCHIVED') restoredForIndia++;
+        } else {
+          await this.prisma.product.update({
+            where: { id: product.id },
+            data: { metadata: JSON.stringify({ ...metadata, shippingIndia }) },
+          });
         }
         const inv = await adapter.getInventory(sourceProductId);
         const totalQuantity = inv.variants.reduce((total, item) => total + Math.max(0, Number(item.quantity) || 0), 0);
@@ -802,7 +899,14 @@ export class CJDropshippingService {
         skipped++;
       }
     }
-    return { success: true, processed: products.length, updated, skipped };
+    return {
+      success: true,
+      processed: products.length,
+      updated,
+      skipped,
+      archivedForIndia,
+      restoredForIndia,
+    };
   }
 
   // -- shipping / logistics ----------------------------------------------------
