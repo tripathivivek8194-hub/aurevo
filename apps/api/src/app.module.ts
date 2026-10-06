@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { ScheduleModule } from '@nestjs/schedule';
 import { APP_GUARD } from '@nestjs/core';
 import { AppThrottlerGuard } from './common/guards/app-throttler.guard';
 import { PrismaModule } from './database/prisma.module';
@@ -34,6 +35,9 @@ import { validateEnv } from './config/env.validation';
       cache: true,
       validate: validateEnv,
     }),
+
+    // Scheduling
+    ScheduleModule.forRoot(),
 
     // Rate limiting
     ThrottlerModule.forRoot([

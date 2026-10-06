@@ -18,13 +18,14 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   async onModuleInit() {
     // Log queries in development
     if (process.env.NODE_ENV === 'development') {
-      // @ts-ignore - Prisma query event typing varies with the generated client
       this.$on('query', (e: { query: string; params: string; duration: number }) => {
         this.logger.debug(`Query: ${e.query} | Params: ${e.params} | Duration: ${e.duration}ms`);
       });
     }
-    await this.$connect();
-    this.logger.log('Database connected');
+    // Prisma connects on the first query. Keeping startup non-blocking means a
+    // brief database/network blip cannot stop the whole storefront API from
+    // accepting health checks and recovering normally.
+    this.logger.log('Prisma client ready');
   }
 
   async onModuleDestroy() {

@@ -1,13 +1,39 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { subDays, format, startOfDay, endOfDay } from 'date-fns';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class AnalyticsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  async recordStoreEvent(input: {
+    visitorId: string;
+    event: string;
+    source?: string;
+    path?: string;
+    productId?: string;
+  }) {
+    await this.prisma.$executeRaw`
+      INSERT INTO "analytics_events" ("id", "visitorId", "event", "source", "path", "productId", "createdAt")
+      VALUES (${randomUUID()}, ${input.visitorId}, ${input.event}, ${input.source ?? null}, ${input.path ?? null}, ${input.productId ?? null}, NOW())
+    `;
+  }
+
+  private async uniqueVisitors(event: string, startDate: Date, endDate: Date) {
+    const rows = await this.prisma.$queryRaw<Array<{ count: bigint }>>`
+      SELECT COUNT(DISTINCT "visitorId") AS "count"
+      FROM "analytics_events"
+      WHERE "event" = ${event}
+        AND "createdAt" >= ${startDate}
+        AND "createdAt" <= ${endDate}
+    `;
+    return Number(rows[0]?.count ?? 0);
+  }
+
   async getRevenueAnalytics(params: { startDate: Date; endDate: Date }) {
-    const { startDate, endDate } = params;
+    const startDate = startOfDay(params.startDate);
+    const endDate = endOfDay(params.endDate);
 
     const orders = await this.prisma.order.findMany({
       where: {
@@ -22,7 +48,8 @@ export class AnalyticsService {
     const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
 
     // Daily breakdown
-    const daily = orders.reduce((acc, order) => {
+    type DailyData = { date: string; revenue: number; orders: number; aov: number };
+    const daily: Record<string, DailyData> = orders.reduce((acc, order) => {
       const date = format(order.createdAt, 'yyyy-MM-dd');
       if (!acc[date]) {
         acc[date] = { date, revenue: 0, orders: 0, aov: 0 };
@@ -30,41 +57,34 @@ export class AnalyticsService {
       acc[date].revenue += order.total;
       acc[date].orders += 1;
       return acc;
-    }, {} as Record<string, { date: string; revenue: number; orders: number; aov: number }>);
+    }, {} as Record<string, DailyData>);
 
-    const dailyRows = Object.values(daily) as Array<{
-      date: string;
-      revenue: number;
-      orders: number;
-      aov: number;
-    }>;
-
-    dailyRows.forEach(d => {
+    const dailyValues: DailyData[] = Object.values(daily);
+    dailyValues.forEach(d => {
       d.aov = d.orders > 0 ? d.revenue / d.orders : 0;
     });
 
     return {
       summary: { totalRevenue, totalOrders, avgOrderValue },
-      daily: dailyRows.sort((a, b) => a.date.localeCompare(b.date)),
+      daily: dailyValues.sort((a, b) => a.date.localeCompare(b.date)),
     };
   }
 
   async getConversionFunnel(params: { startDate: Date; endDate: Date }) {
-    const { startDate, endDate } = params;
+    const startDate = startOfDay(params.startDate);
+    const endDate = endOfDay(params.endDate);
 
-    // This would typically come from analytics events
-    // For now, we'll approximate from order data
     const [
-      sessions, // Would come from analytics
+      sessions,
       productViews,
       addToCarts,
       checkoutsStarted,
       ordersPlaced,
     ] = await Promise.all([
-      Promise.resolve(0), // Placeholder
-      this.prisma.product.count(), // Approximation
-      this.prisma.cartItem.count(),
-      this.prisma.order.count({ where: { createdAt: { gte: startDate, lte: endDate } } }),
+      this.uniqueVisitors('SESSION', startDate, endDate),
+      this.uniqueVisitors('PRODUCT_VIEW', startDate, endDate),
+      this.uniqueVisitors('ADD_TO_CART', startDate, endDate),
+      this.uniqueVisitors('CHECKOUT_STARTED', startDate, endDate),
       this.prisma.order.count({
         where: { createdAt: { gte: startDate, lte: endDate }, status: { notIn: ['CANCELLED', 'FAILED'] } },
       }),
@@ -86,7 +106,8 @@ export class AnalyticsService {
   }
 
   async getCustomerAnalytics(params: { startDate: Date; endDate: Date }) {
-    const { startDate, endDate } = params;
+    const startDate = startOfDay(params.startDate);
+    const endDate = endOfDay(params.endDate);
 
     const [
       newCustomers,
@@ -130,7 +151,8 @@ export class AnalyticsService {
   }
 
   async getProductAnalytics(params: { startDate: Date; endDate: Date }) {
-    const { startDate, endDate } = params;
+    const startDate = startOfDay(params.startDate);
+    const endDate = endOfDay(params.endDate);
 
     const topSelling = await this.prisma.orderItem.groupBy({
       by: ['productId'],
@@ -180,16 +202,18 @@ export class AnalyticsService {
   }
 
   async getTrafficSources() {
-    // This would typically come from analytics tracking
-    // Placeholder implementation
-    return [
-      { source: 'Direct', sessions: 0, revenue: 0, conversionRate: 0 },
-      { source: 'Organic Search', sessions: 0, revenue: 0, conversionRate: 0 },
-      { source: 'Paid Search', sessions: 0, revenue: 0, conversionRate: 0 },
-      { source: 'Social', sessions: 0, revenue: 0, conversionRate: 0 },
-      { source: 'Email', sessions: 0, revenue: 0, conversionRate: 0 },
-      { source: 'Referral', sessions: 0, revenue: 0, conversionRate: 0 },
-    ];
+    const since = subDays(new Date(), 30);
+    return this.prisma.$queryRaw<Array<{ source: string; sessions: bigint }>>`
+      SELECT COALESCE("source", 'DIRECT') AS "source",
+             COUNT(DISTINCT "visitorId") AS "sessions"
+      FROM "analytics_events"
+      WHERE "event" = 'SESSION' AND "createdAt" >= ${since}
+      GROUP BY COALESCE("source", 'DIRECT')
+      ORDER BY "sessions" DESC
+    `.then((rows) => rows.map((row) => ({
+      source: row.source,
+      sessions: Number(row.sessions),
+    })));
   }
 
   async getRealTimeStats() {
@@ -197,10 +221,14 @@ export class AnalyticsService {
     const lastHour = subDays(now, 1/24);
     const last24Hours = subDays(now, 1);
 
-    const [ordersLastHour, ordersLast24Hours, activeUsers, revenueLast24Hours] = await Promise.all([
+    const [ordersLastHour, ordersLast24Hours, activeVisitorRows, revenueLast24Hours] = await Promise.all([
       this.prisma.order.count({ where: { createdAt: { gte: lastHour } } }),
       this.prisma.order.count({ where: { createdAt: { gte: last24Hours } } }),
-      Promise.resolve(0), // Would come from session tracking
+      this.prisma.$queryRaw<Array<{ count: bigint }>>`
+        SELECT COUNT(DISTINCT "visitorId") AS "count"
+        FROM "analytics_events"
+        WHERE "createdAt" >= ${new Date(now.getTime() - 15 * 60 * 1000)}
+      `,
       this.prisma.order.aggregate({
         where: { createdAt: { gte: last24Hours }, status: { notIn: ['CANCELLED', 'FAILED'] } },
         _sum: { total: true },
@@ -210,7 +238,7 @@ export class AnalyticsService {
     return {
       ordersLastHour,
       ordersLast24Hours,
-      activeUsers,
+      activeUsers: Number(activeVisitorRows[0]?.count ?? 0),
       revenueLast24Hours: revenueLast24Hours._sum.total ?? 0,
       timestamp: now.toISOString(),
     };

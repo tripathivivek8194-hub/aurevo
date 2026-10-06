@@ -157,7 +157,8 @@ export class AdminService {
     });
 
     // Group by date
-    const grouped = orders.reduce((acc, order) => {
+    type DailySales = { date: string; revenue: number; orders: number };
+    const grouped: Record<string, DailySales> = orders.reduce((acc, order) => {
       let key: string;
       if (groupBy === 'day') {
         key = format(order.createdAt, 'yyyy-MM-dd');
@@ -173,15 +174,10 @@ export class AdminService {
       acc[key].revenue += order.total;
       acc[key].orders += 1;
       return acc;
-    }, {} as Record<string, { date: string; revenue: number; orders: number }>);
+    }, {} as Record<string, DailySales>);
 
-    const reportRows = Object.values(grouped) as Array<{
-      date: string;
-      revenue: number;
-      orders: number;
-    }>;
-
-    return reportRows.sort((a, b) => a.date.localeCompare(b.date));
+    const result: DailySales[] = Object.values(grouped);
+    return result.sort((a, b) => a.date.localeCompare(b.date));
   }
 
   async getProductReport() {
@@ -200,17 +196,17 @@ export class AdminService {
       _sum: { totalPrice: true, quantity: true },
     });
 
-    type ProductRevenue = (typeof productRevenue)[number];
-    const revenueMap = new Map<string, ProductRevenue>(
-      productRevenue.map(p => [p.productId, p] as [string, ProductRevenue]),
+    type ProductRevenue = { productId: string; _sum: { totalPrice: number | null; quantity: bigint | null } };
+    const revenueMap = new Map<string, ProductRevenue | undefined>(
+      productRevenue.map((p) => [p.productId, p as ProductRevenue])
     );
 
     return products.map(product => {
       const rev = revenueMap.get(product.id);
       return {
         ...product,
-        revenue: rev ? Number(rev._sum.totalPrice) : 0,
-        unitsSold: rev ? rev._sum.quantity : 0,
+        revenue: rev && rev._sum.totalPrice ? Number(rev._sum.totalPrice) : 0,
+        unitsSold: rev && rev._sum.quantity ? Number(rev._sum.quantity) : 0,
         reviewCount: product._count.reviews,
         inventory: product.inventory,
       };
