@@ -44,6 +44,14 @@ services:
         sync: false
       - key: ALIEXPRESS_ACCESS_TOKEN
         sync: false
+      - key: ENABLE_STOCK_SYNC
+        value: "true"
+      - key: ENABLE_FULL_CATALOG_SYNC
+        value: "false"
+      - key: STOCK_SYNC_INTERVAL_MINUTES
+        value: "30"
+      - key: STOCK_SYNC_BATCH_SIZE
+        value: "20"
       - key: INDIAMART_CRM_ID
         sync: false
       - key: INDIAMART_API_KEY
