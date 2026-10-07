@@ -169,12 +169,8 @@ export class SupplierSyncScheduler implements OnModuleInit {
     try {
       const suppliers = await this.suppliersService.findAll();
       activeSuppliers = suppliers.filter((s) => s.isActive && s.syncEnabled);
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Unknown error occurred';
-      this.logger.error(
-        `Failed to load suppliers for sync: ${message.slice(0, 100)}`,
-      );
+    } catch {
+      this.logger.error('Failed to load suppliers for stock sync');
       return false;
     }
 
@@ -220,7 +216,7 @@ export class SupplierSyncScheduler implements OnModuleInit {
           message: `Processed: ${result.processed}, Updated: ${result.updated}, Skipped: ${result.skipped}, Failed fetches: ${result.failedFetches}, Unmatched variants: ${result.unmatchedVariants}, Archived for India: ${result.archivedForIndia}, Restored for India: ${result.restoredForIndia}`,
         };
       } else if (code === SupplierCode.CJDROPSHIPPING) {
-        const result = await this.cjService.syncInventory();
+        const result = await this.cjService.syncInventory(batchSize);
         return {
           supplier: 'CJDROPSHIPPING',
           status: result.success ? 'success' : 'error',
@@ -233,13 +229,11 @@ export class SupplierSyncScheduler implements OnModuleInit {
           message: 'Unsupported supplier',
         };
       }
-    } catch (error) {
-      // Never expose credentials, tokens, authorization headers, or full supplier responses
-      const message =
-        error instanceof Error ? error.message : 'Unknown error occurred';
-      this.logger.error(
-        `Stock sync failed for ${code}: ${message.slice(0, 100)}`,
-      );
+    } catch {
+      // Supplier errors can embed credentials or full response bodies. Keep
+      // scheduled-job logs intentionally generic and let the supplier service
+      // own any safe diagnostic logging.
+      this.logger.error(`Stock sync failed for ${code}`);
       return {
         supplier: code,
         status: 'error',

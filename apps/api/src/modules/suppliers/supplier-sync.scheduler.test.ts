@@ -267,7 +267,7 @@ describe('SupplierSyncScheduler', () => {
 
       expect(suppliersService.findAll).toHaveBeenCalled();
       expect(aliExpressService.syncInventory).toHaveBeenCalled();
-      expect(cjService.syncInventory).toHaveBeenCalled();
+      expect(cjService.syncInventory).toHaveBeenCalledWith(20);
     });
 
     it('should prevent overlapping runs', async () => {
@@ -327,7 +327,7 @@ describe('SupplierSyncScheduler', () => {
       await scheduler['runStockSync']();
 
       expect(aliExpressService.syncInventory).toHaveBeenCalledWith(5);
-      expect(cjService.syncInventory).toHaveBeenCalled();
+      expect(cjService.syncInventory).toHaveBeenCalledWith(5);
     });
 
     it('should skip suppliers that are not active', async () => {
@@ -349,7 +349,7 @@ describe('SupplierSyncScheduler', () => {
 
       // Only CJ should be synced (AliExpress is inactive)
       expect(aliExpressService.syncInventory).not.toHaveBeenCalled();
-      expect(cjService.syncInventory).toHaveBeenCalled();
+      expect(cjService.syncInventory).toHaveBeenCalledWith(20);
     });
 
     it('should skip suppliers with sync disabled', async () => {
@@ -370,7 +370,7 @@ describe('SupplierSyncScheduler', () => {
       await scheduler['runStockSync']();
 
       expect(aliExpressService.syncInventory).not.toHaveBeenCalled();
-      expect(cjService.syncInventory).toHaveBeenCalled();
+      expect(cjService.syncInventory).toHaveBeenCalledWith(20);
     });
 
     it('should skip when no active suppliers', async () => {
@@ -404,7 +404,7 @@ describe('SupplierSyncScheduler', () => {
       await scheduler['runStockSync']();
 
       // CJ should still be synced even though AliExpress failed
-      expect(cjService.syncInventory).toHaveBeenCalled();
+      expect(cjService.syncInventory).toHaveBeenCalledWith(20);
     });
 
     it('should log completion with success and fail counts', async () => {
@@ -448,7 +448,7 @@ describe('SupplierSyncScheduler', () => {
       expect(result.supplier).toBe('CJDROPSHIPPING');
       expect(result.status).toBe('success');
       expect(result.message).toContain('Updated: 5');
-      expect(cjService.syncInventory).toHaveBeenCalled();
+      expect(cjService.syncInventory).toHaveBeenCalledWith(5);
     });
 
     it('should mark as error when AliExpress sync fails', async () => {
@@ -484,10 +484,9 @@ describe('SupplierSyncScheduler', () => {
 
       await scheduler['syncSupplierStock'](SupplierCode.ALIEXPRESS, 5);
 
-      // Verify error log truncates to 100 chars
+      // Verify scheduler logs never include raw supplier error text.
       const callArgs = errorSpy.mock.calls[0][0] as string;
-      expect(callArgs).toContain('Stock sync failed for ALIEXPRESS:');
-      expect(callArgs.length).toBeLessThan(200); // Should be much shorter
+      expect(callArgs).toBe('Stock sync failed for ALIEXPRESS');
       expect(callArgs).not.toContain('secret-api-key');
     });
 
