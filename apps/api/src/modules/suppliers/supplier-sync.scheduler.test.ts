@@ -51,16 +51,15 @@ describe('SupplierSyncScheduler', () => {
 
     // Mock AliExpressService
     aliExpressService = {
-      syncInventoryBatch: jest.fn().mockResolvedValue({
-        scanned: 5,
+      syncInventory: jest.fn().mockResolvedValue({
+        success: true,
+        processed: 5,
         updated: 3,
-        failed: 0,
-        needsVariantSetup: 1,
-        unavailable: 1,
-        dryRun: false,
-        nextCursor: null,
-        hasMore: false,
-        items: [],
+        skipped: 2,
+        failedFetches: 0,
+        unmatchedVariants: 1,
+        archivedForIndia: 1,
+        restoredForIndia: 0,
       }),
     } as any;
 
@@ -253,7 +252,7 @@ describe('SupplierSyncScheduler', () => {
       await scheduler.handleScheduledSync();
 
       expect(suppliersService.findAll).not.toHaveBeenCalled();
-      expect(aliExpressService.syncInventoryBatch).not.toHaveBeenCalled();
+      expect(aliExpressService.syncInventory).not.toHaveBeenCalled();
       expect(cjService.syncInventory).not.toHaveBeenCalled();
     });
 
@@ -267,7 +266,7 @@ describe('SupplierSyncScheduler', () => {
       await scheduler.handleScheduledSync();
 
       expect(suppliersService.findAll).toHaveBeenCalled();
-      expect(aliExpressService.syncInventoryBatch).toHaveBeenCalled();
+      expect(aliExpressService.syncInventory).toHaveBeenCalled();
       expect(cjService.syncInventory).toHaveBeenCalled();
     });
 
@@ -278,8 +277,8 @@ describe('SupplierSyncScheduler', () => {
         return undefined;
       });
       // Simulate a slow sync by making it wait
-      aliExpressService.syncInventoryBatch.mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve({ updated: 1, failed: 0 }), 100)),
+      aliExpressService.syncInventory.mockImplementation(
+        () => new Promise((resolve) => setTimeout(() => resolve({ success: true, updated: 1 }), 100)),
       );
 
       // Start first sync
@@ -306,7 +305,7 @@ describe('SupplierSyncScheduler', () => {
 
     it('should release lock even if sync fails', async () => {
       configService.get.mockReturnValue('true');
-      aliExpressService.syncInventoryBatch.mockRejectedValue(
+      aliExpressService.syncInventory.mockRejectedValue(
         new Error('API Error'),
       );
 
@@ -327,10 +326,7 @@ describe('SupplierSyncScheduler', () => {
 
       await scheduler['runStockSync']();
 
-      expect(aliExpressService.syncInventoryBatch).toHaveBeenCalledWith({
-        limit: 5,
-        dryRun: false,
-      });
+      expect(aliExpressService.syncInventory).toHaveBeenCalledWith(5);
       expect(cjService.syncInventory).toHaveBeenCalled();
     });
 
@@ -352,7 +348,7 @@ describe('SupplierSyncScheduler', () => {
       await scheduler['runStockSync']();
 
       // Only CJ should be synced (AliExpress is inactive)
-      expect(aliExpressService.syncInventoryBatch).not.toHaveBeenCalled();
+      expect(aliExpressService.syncInventory).not.toHaveBeenCalled();
       expect(cjService.syncInventory).toHaveBeenCalled();
     });
 
@@ -373,7 +369,7 @@ describe('SupplierSyncScheduler', () => {
 
       await scheduler['runStockSync']();
 
-      expect(aliExpressService.syncInventoryBatch).not.toHaveBeenCalled();
+      expect(aliExpressService.syncInventory).not.toHaveBeenCalled();
       expect(cjService.syncInventory).toHaveBeenCalled();
     });
 
@@ -391,7 +387,7 @@ describe('SupplierSyncScheduler', () => {
       expect(logSpy).toHaveBeenCalledWith(
         'No active suppliers with sync enabled - skipping',
       );
-      expect(aliExpressService.syncInventoryBatch).not.toHaveBeenCalled();
+      expect(aliExpressService.syncInventory).not.toHaveBeenCalled();
       expect(cjService.syncInventory).not.toHaveBeenCalled();
     });
 
@@ -400,7 +396,7 @@ describe('SupplierSyncScheduler', () => {
         if (key === 'ENABLE_STOCK_SYNC') return 'true';
         return undefined;
       });
-      aliExpressService.syncInventoryBatch.mockRejectedValue(
+      aliExpressService.syncInventory.mockRejectedValue(
         new Error('API Error'),
       );
       scheduler['tryAcquireLock']();
@@ -443,10 +439,7 @@ describe('SupplierSyncScheduler', () => {
       expect(result.supplier).toBe('ALIEXPRESS');
       expect(result.status).toBe('success');
       expect(result.message).toContain('Updated: 3');
-      expect(aliExpressService.syncInventoryBatch).toHaveBeenCalledWith({
-        limit: 5,
-        dryRun: false,
-      });
+      expect(aliExpressService.syncInventory).toHaveBeenCalledWith(5);
     });
 
     it('should sync CJ Dropshipping supplier successfully', async () => {
@@ -459,7 +452,7 @@ describe('SupplierSyncScheduler', () => {
     });
 
     it('should mark as error when AliExpress sync fails', async () => {
-      aliExpressService.syncInventoryBatch.mockRejectedValue(
+      aliExpressService.syncInventory.mockRejectedValue(
         new Error('Network timeout'),
       );
 
@@ -484,7 +477,7 @@ describe('SupplierSyncScheduler', () => {
 
     it('should truncate error messages to prevent credential exposure', async () => {
       const longError = 'x'.repeat(150) + 'secret-api-key-12345';
-      aliExpressService.syncInventoryBatch.mockRejectedValue(
+      aliExpressService.syncInventory.mockRejectedValue(
         new Error(longError),
       );
       const errorSpy = jest.spyOn(Logger.prototype, 'error');
@@ -499,9 +492,12 @@ describe('SupplierSyncScheduler', () => {
     });
 
     it('should mark AliExpress as error when no products updated and some failed', async () => {
-      aliExpressService.syncInventoryBatch.mockResolvedValue({
+      aliExpressService.syncInventory.mockResolvedValue({
+        success: false,
+        processed: 3,
         updated: 0,
-        failed: 3,
+        skipped: 3,
+        failedFetches: 3,
       });
 
       const result = await scheduler['syncSupplierStock'](SupplierCode.ALIEXPRESS, 5);
@@ -510,15 +506,18 @@ describe('SupplierSyncScheduler', () => {
     });
 
     it('should mark AliExpress as success when products were updated', async () => {
-      aliExpressService.syncInventoryBatch.mockResolvedValue({
+      aliExpressService.syncInventory.mockResolvedValue({
+        success: true,
+        processed: 3,
         updated: 2,
-        failed: 1,
+        skipped: 1,
+        failedFetches: 1,
       });
 
       const result = await scheduler['syncSupplierStock'](SupplierCode.ALIEXPRESS, 5);
 
       expect(result.status).toBe('success');
-      expect(result.message).toContain('Updated: 2, Failed: 1');
+      expect(result.message).toContain('Updated: 2, Skipped: 1, Failed fetches: 1');
     });
 
     it('should skip unsupported suppliers', async () => {
@@ -573,8 +572,8 @@ describe('SupplierSyncScheduler', () => {
         if (key === 'ENABLE_STOCK_SYNC') return 'true';
         return undefined;
       });
-      aliExpressService.syncInventoryBatch.mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve({ updated: 1, failed: 0 }), 100)),
+      aliExpressService.syncInventory.mockImplementation(
+        () => new Promise((resolve) => setTimeout(() => resolve({ success: true, updated: 1 }), 100)),
       );
 
       // Start first manual sync
@@ -639,8 +638,8 @@ describe('SupplierSyncScheduler', () => {
 
     it('should report running status during sync', async () => {
       configService.get.mockReturnValue('true');
-      aliExpressService.syncInventoryBatch.mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve({ updated: 1, failed: 0 }), 100)),
+      aliExpressService.syncInventory.mockImplementation(
+        () => new Promise((resolve) => setTimeout(() => resolve({ success: true, updated: 1 }), 100)),
       );
 
       const syncPromise = scheduler.handleScheduledSync();

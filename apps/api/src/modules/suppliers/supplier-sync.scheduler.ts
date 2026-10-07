@@ -213,16 +213,11 @@ export class SupplierSyncScheduler implements OnModuleInit {
   }> {
     try {
       if (code === SupplierCode.ALIEXPRESS) {
-        const result = await this.aliExpressService.syncInventoryBatch({
-          limit: batchSize,
-          dryRun: false,
-        });
-        // Success if any updates OR no failures (even with 0 updates)
-        const isSuccess = result.updated > 0 || result.failed === 0;
+        const result = await this.aliExpressService.syncInventory(batchSize);
         return {
           supplier: 'ALIEXPRESS',
-          status: isSuccess ? 'success' : 'error',
-          message: `Scanned: ${result.scanned}, Updated: ${result.updated}, Failed: ${result.failed}, Unavailable: ${result.unavailable}, NeedsVariants: ${result.needsVariantSetup}`,
+          status: result.success ? 'success' : 'error',
+          message: `Processed: ${result.processed}, Updated: ${result.updated}, Skipped: ${result.skipped}, Failed fetches: ${result.failedFetches}, Unmatched variants: ${result.unmatchedVariants}, Archived for India: ${result.archivedForIndia}, Restored for India: ${result.restoredForIndia}`,
         };
       } else if (code === SupplierCode.CJDROPSHIPPING) {
         const result = await this.cjService.syncInventory();
