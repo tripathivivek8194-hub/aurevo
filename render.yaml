@@ -48,6 +48,8 @@ services:
         value: "true"
       - key: ENABLE_FULL_CATALOG_SYNC
         value: "false"
+      - key: ENABLE_SUPPLIER_SYNC
+        value: "false"
       - key: STOCK_SYNC_INTERVAL_MINUTES
         value: "30"
       - key: STOCK_SYNC_BATCH_SIZE
