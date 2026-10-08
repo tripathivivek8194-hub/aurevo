@@ -2,10 +2,18 @@ import { Logger } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { createApp } from './create-app';
 import { shouldExposeApiDocs } from './config/swagger';
+import { PrismaService } from './database/prisma.service';
+import { recoverCatalogIfEmpty } from './database/catalog-recovery';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
   const app = await createApp();
+
+  // A new Neon database contains the schema but none of the catalog rows.
+  // Restore only the bundled catalog snapshot, and only while the catalog is
+  // completely empty. The importer is idempotent and never touches customers,
+  // orders, payments, or credentials.
+  await recoverCatalogIfEmpty(app.get(PrismaService), logger);
 
   // Swagger documentation — exposed ONLY outside production so the full admin
   // surface (and its saved bearer credentials) is never reachable publicly.

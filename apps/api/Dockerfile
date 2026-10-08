@@ -71,6 +71,7 @@ COPY --from=build /app/packages/shared/dist packages/shared/dist
 # exact repository tree that Prisma validated during compilation.
 COPY --from=build /app/apps/api/prisma/schema.prisma apps/api/prisma/schema.prisma
 COPY --from=build /app/apps/api/prisma/migrations apps/api/prisma/migrations
+COPY --from=build /app/apps/api/prisma/recovery-catalog.json apps/api/prisma/recovery-catalog.json
 COPY --from=build /app/node_modules/.prisma node_modules/.prisma
 COPY --from=build /app/node_modules/@prisma/client node_modules/@prisma/client
 # Prisma CLI is a devDependency, but we need it for `db push` at startup.
