@@ -8,7 +8,6 @@ import { useSeo } from '../../hooks/useSeo';
 import { getSessionId } from '../../lib/session';
 import { useAuthStore } from '../../stores/auth';
 import { useRazorpay } from '../../hooks/useRazorpay';
-import { razorpayKeyId } from '../../lib/razorpay';
 
 /* ------------------------------------------------------------------ */
 /* Types                                                              */
@@ -736,9 +735,6 @@ export function Checkout() {
     );
   }
 
-  const hasRazorpayKey =
-    !!razorpayKeyId();
-
   /* -------------------------------------------------------------- */
   /* Main checkout                                                    */
   /* -------------------------------------------------------------- */
@@ -1164,13 +1160,10 @@ export function Checkout() {
                       startingPayment ||
                       !preview ||
                       preview.items.length ===
-                        0 ||
-                      !hasRazorpayKey
+                        0
                     }
                   >
-                    {!hasRazorpayKey
-                      ? 'Payments coming soon'
-                      : orderMutation.isPending
+                    {orderMutation.isPending
                         ? 'Placing order…'
                         : startingPayment
                           ? 'Preparing payment…'

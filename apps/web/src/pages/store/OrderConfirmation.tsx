@@ -7,7 +7,6 @@ import { formatMoney, formatDate } from '../../lib/format';
 import { getSessionId } from '../../lib/session';
 import { useAuthStore } from '../../stores/auth';
 import { useRazorpay } from '../../hooks/useRazorpay';
-import { razorpayKeyId } from '../../lib/razorpay';
 import { useSeo } from '../../hooks/useSeo';
 
 interface OrderItem {
@@ -222,7 +221,6 @@ export function OrderConfirmation() {
   const statusLabel = STATUS_LABELS[order.status] ?? order.status;
   const hasPaymentIssue =
     order.status === 'PAYMENT_PENDING' && !paidJustNow;
-  const hasKey = !!razorpayKeyId();
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-14 lg:py-16">
@@ -594,14 +592,11 @@ export function OrderConfirmation() {
               <Button
                 onClick={payNow}
                 disabled={
-                  !hasKey ||
                   paymentStatus === 'creating' ||
                   paymentStatus === 'verifying'
                 }
               >
-                {!hasKey
-                  ? 'Payments coming soon'
-                  : paymentStatus === 'creating' ||
+                {paymentStatus === 'creating' ||
                       paymentStatus === 'verifying'
                     ? 'Processing payment…'
                     : 'Pay now'}
