@@ -196,9 +196,8 @@ export class AdminService {
       _sum: { totalPrice: true, quantity: true },
     });
 
-    type ProductRevenue = { productId: string; _sum: { totalPrice: number | null; quantity: bigint | null } };
-    const revenueMap = new Map<string, ProductRevenue | undefined>(
-      productRevenue.map((p) => [p.productId, p as ProductRevenue])
+    const revenueMap = new Map(
+      productRevenue.map((product) => [product.productId, product] as const),
     );
 
     return products.map(product => {
