@@ -311,10 +311,16 @@ export class AuthService {
     }
 
     // Get user
-    const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
+    let user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
     if (!user || !user.isActive) {
       throw new UnauthorizedException('User not found or inactive');
     }
+
+    // Keep configured store-owner accounts authoritative even when the browser
+    // is using a session created before ADMIN_EMAIL was configured. This lets
+    // the normal boot-time refresh repair the role without requiring a password
+    // reset or another Google sign-in.
+    user = await this.ensureConfiguredAdminRole(user);
 
     // Revoke old refresh token (rotation). Guard both failure modes that used
     // to surface as a 500: (a) a token without an `exp` claim makes
@@ -487,10 +493,11 @@ export class AuthService {
   }
 
   async me(userId: string) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    let user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
       throw new UnauthorizedException('User not found');
     }
+    user = await this.ensureConfiguredAdminRole(user);
     return this.sanitizeUser(user);
   }
 
@@ -595,6 +602,21 @@ export class AuthService {
     return adminEmails.includes(email.toLowerCase().trim())
       ? UserRole.ADMIN
       : UserRole.CUSTOMER;
+  }
+
+  /** Promote the configured store owner when an older session still says CUSTOMER. */
+  private async ensureConfiguredAdminRole(user: any) {
+    if (
+      this.roleForEmail(user.email) === UserRole.ADMIN &&
+      user.role !== UserRole.ADMIN
+    ) {
+      return this.prisma.user.update({
+        where: { id: user.id },
+        data: { role: UserRole.ADMIN },
+      });
+    }
+
+    return user;
   }
 
   private sanitizeUser(user: any) {

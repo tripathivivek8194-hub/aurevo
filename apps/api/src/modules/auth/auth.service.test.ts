@@ -24,6 +24,78 @@ jest.mock('bcrypt', () => {
   };
 });
 
+describe('AuthService — configured admin session repair', () => {
+  function build() {
+    const prisma: any = {
+      user: {
+        findUnique: jest.fn(),
+        update: jest.fn(),
+      },
+      refreshToken: { create: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
+      revokedToken: { findUnique: jest.fn().mockResolvedValue(null), create: jest.fn() },
+    };
+    const jwtService: any = {
+      verify: jest.fn(() => ({
+        sub: 'owner-1',
+        jti: 'refresh-1',
+        exp: Math.floor(Date.now() / 1000) + 3600,
+      })),
+      sign: jest.fn(() => 'signed.token'),
+      decode: jest.fn(() => ({ exp: Math.floor(Date.now() / 1000) + 900 })),
+    };
+    const configService: any = {
+      get: jest.fn((key: string) =>
+        key === 'ADMIN_EMAIL' ? 'admin@aurevo.buzz' : undefined,
+      ),
+    };
+    const service = new AuthService(
+      prisma,
+      {},
+      jwtService,
+      configService,
+      {},
+    );
+    return { service, prisma, jwtService };
+  }
+
+  const customerOwner = {
+    id: 'owner-1',
+    email: 'admin@aurevo.buzz',
+    role: UserRole.CUSTOMER,
+    isActive: true,
+    passwordHash: 'secret',
+  };
+
+  it('promotes an existing configured owner during refresh and mints ADMIN tokens', async () => {
+    const { service, prisma, jwtService } = build();
+    prisma.user.findUnique.mockResolvedValue(customerOwner);
+    prisma.user.update.mockResolvedValue({ ...customerOwner, role: UserRole.ADMIN });
+    const response = { cookie: jest.fn() };
+
+    const result = await service.refresh('old-refresh-token', response);
+
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { id: 'owner-1' },
+      data: { role: UserRole.ADMIN },
+    });
+    expect(jwtService.sign).toHaveBeenCalledWith(
+      expect.objectContaining({ role: UserRole.ADMIN }),
+    );
+    expect(result.user.role).toBe(UserRole.ADMIN);
+  });
+
+  it('returns the repaired ADMIN role from the current-user lookup', async () => {
+    const { service, prisma } = build();
+    prisma.user.findUnique.mockResolvedValue(customerOwner);
+    prisma.user.update.mockResolvedValue({ ...customerOwner, role: UserRole.ADMIN });
+
+    const result = await service.me('owner-1');
+
+    expect(result.role).toBe(UserRole.ADMIN);
+    expect(result).not.toHaveProperty('passwordHash');
+  });
+});
+
 /**
  * Security regression tests for the M1/M2 auth hardening: privilege escalation
  * is impossible (role is derived server-side from ADMIN_EMAIL), weak passwords
