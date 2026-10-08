@@ -60,13 +60,7 @@ export class AuthService {
       throw new ConflictException('Email already registered');
     }
 
-    // Check if this is an admin email (supports comma-separated list, case-insensitive)
-    const adminEmails = (this.configService.get<string>('ADMIN_EMAIL') || '')
-      .toLowerCase()
-      .split(',')
-      .map((e) => e.trim())
-      .filter(Boolean);
-    const role = adminEmails.includes(email) ? UserRole.ADMIN : UserRole.CUSTOMER;
+    const role = this.roleForEmail(email);
 
     // Create user
     const user = await this.prisma.user.create({
@@ -196,29 +190,40 @@ export class AuthService {
     }
 
     let user = googleUser || emailUser;
+    const configuredRole = this.roleForEmail(email);
 
     if (user) {
       if (!user.isActive) {
         throw new UnauthorizedException('Account is deactivated');
       }
 
-      // Existing AUREVO account: link Google to it.
+      // Existing AUREVO account: link Google to it and ensure configured admin
+      // addresses receive the same role as password-based registrations.
+      const updateData: {
+        googleId?: string;
+        emailVerified?: boolean;
+        role?: UserRole;
+      } = {};
+
       if (!user.googleId) {
-        user = await this.prisma.user.update({
-          where: { id: user.id },
-          data: {
-            googleId,
-            emailVerified: true,
-          },
-        });
+        updateData.googleId = googleId;
+        updateData.emailVerified = true;
       } else if (user.googleId !== googleId) {
         throw new UnauthorizedException(
           'This email is already linked to another Google account',
         );
       } else if (!user.emailVerified) {
+        updateData.emailVerified = true;
+      }
+
+      if (configuredRole === UserRole.ADMIN && user.role !== UserRole.ADMIN) {
+        updateData.role = UserRole.ADMIN;
+      }
+
+      if (Object.keys(updateData).length > 0) {
         user = await this.prisma.user.update({
           where: { id: user.id },
-          data: { emailVerified: true },
+          data: updateData,
         });
       }
     } else {
@@ -247,7 +252,7 @@ export class AuthService {
           passwordHash,
           firstName,
           lastName,
-          role: UserRole.CUSTOMER,
+          role: configuredRole,
           emailVerified: true,
         },
       });
@@ -579,7 +584,20 @@ export class AuthService {
     return crypto.createHash('sha256').update(token).digest('hex');
   }
 
-    private sanitizeUser(user: any) {
+  /** Resolve privileged accounts consistently across every sign-in method. */
+  private roleForEmail(email: string): UserRole {
+    const adminEmails = (this.configService.get<string>('ADMIN_EMAIL') || '')
+      .toLowerCase()
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+
+    return adminEmails.includes(email.toLowerCase().trim())
+      ? UserRole.ADMIN
+      : UserRole.CUSTOMER;
+  }
+
+  private sanitizeUser(user: any) {
     const { passwordHash, googleId, ...sanitized } = user;
     return sanitized;
   }
