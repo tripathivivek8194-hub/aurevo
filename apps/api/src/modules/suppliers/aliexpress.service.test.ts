@@ -158,8 +158,8 @@ describe('AliExpressService.connect', () => {
     expect(url.searchParams.get('response_type')).toBe('code');
     expect(url.searchParams.get('client_id')).toBe(READY_ENV.ALIEXPRESS_APP_KEY);
     expect(url.searchParams.get('redirect_uri')).toBe(READY_ENV.ALIEXPRESS_CALLBACK_URL);
-      expect(url.searchParams.get('locale')).toBe('en_US');
-      expect(url.toString()).not.toContain('locale=undefined');
+    expect(url.searchParams.get('sp')).toBe('ae');
+    expect(url.searchParams.get('force_auth')).toBe('true');
     expect(url.searchParams.get('state')).toBeTruthy();
   });
 });
