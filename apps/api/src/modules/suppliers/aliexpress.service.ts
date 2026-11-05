@@ -369,6 +369,7 @@ export class AliExpressService {
     url.searchParams.set('redirect_uri', callback);
     url.searchParams.set('state', state);
     url.searchParams.set('view', 'web');
+    url.searchParams.set('locale', this.env('ALIEXPRESS_LOCALE') || 'en_US');
     return { state: 'READY', authorizationUrl: url.toString() };
   }
 
